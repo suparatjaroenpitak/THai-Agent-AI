@@ -1,7 +1,7 @@
 import Redis from "ioredis";
 import { env } from "../src/env";
 
-const sockets = new Set<ServerWebSocket<{ workspaceId?: string }>>();
+const sockets = new Set<Bun.ServerWebSocket<{ workspaceId?: string }>>();
 const subscriber = new Redis(env.REDIS_URL);
 
 subscriber.on("message", (_channel, raw) => {

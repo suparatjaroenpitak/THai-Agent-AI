@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { Terminal as XtermTerminal } from "@xterm/xterm";
+import type { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 
 export function TerminalPanel() {
@@ -8,8 +10,8 @@ export function TerminalPanel() {
 
   useEffect(() => {
     let disposed = false;
-    let terminal: { dispose: () => void } | undefined;
-    let fitAddon: { fit: () => void; dispose?: () => void } | undefined;
+    let terminal: XtermTerminal | undefined;
+    let fitAddon: FitAddon | undefined;
 
     async function mountTerminal() {
       const [{ Terminal }, { FitAddon }] = await Promise.all([

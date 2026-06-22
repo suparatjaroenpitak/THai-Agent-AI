@@ -17,7 +17,7 @@ import {
   Terminal,
   UploadCloud
 } from "lucide-react";
-import { Panel, PanelGroup, PanelResizeHandle } from "resizable-panels";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,7 +44,12 @@ const railItems = [
 export function OpenCodexShell() {
   const [commandOpen, setCommandOpen] = useState(false);
   const [localProject, setLocalProject] = useState("Cloud workspace");
+  const [themeReady, setThemeReady] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
+
+  useEffect(() => {
+    setThemeReady(true);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -67,6 +72,8 @@ export function OpenCodexShell() {
     const directory = await window.showDirectoryPicker({ id: "opencodex-project", mode: "readwrite" });
     setLocalProject(directory.name);
   }
+
+  const isDarkTheme = themeReady ? resolvedTheme === "dark" : true;
 
   return (
     <TooltipProvider delayDuration={250}>
@@ -102,9 +109,10 @@ export function OpenCodexShell() {
             <TooltipTrigger asChild>
               <button
                 onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+                disabled={!themeReady}
                 className="flex size-9 items-center justify-center rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200"
               >
-                {resolvedTheme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                {isDarkTheme ? <Sun className="size-4" /> : <Moon className="size-4" />}
                 <span className="sr-only">Theme</span>
               </button>
             </TooltipTrigger>
