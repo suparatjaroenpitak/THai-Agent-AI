@@ -2,11 +2,9 @@
 
 import { ChevronDown, File, Folder, FolderOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { fileTree } from "@/components/opencodex/data";
+import { fileTree, type FileTreeNode } from "@/components/opencodex/data";
 
-type FileNode = (typeof fileTree)[number] | NonNullable<(typeof fileTree)[number]["children"]>[number];
-
-function NodeRow({ node, depth = 0 }: { node: FileNode; depth?: number }) {
+function NodeRow({ node, depth = 0 }: { node: FileTreeNode; depth?: number }) {
   const isFolder = node.type === "folder";
 
   return (
@@ -32,7 +30,7 @@ function NodeRow({ node, depth = 0 }: { node: FileNode; depth?: number }) {
           </Badge>
         ) : null}
       </button>
-      {isFolder && "children" in node
+      {isFolder && node.children
         ? node.children.map((child) => <NodeRow key={child.name} node={child} depth={depth + 1} />)
         : null}
     </div>

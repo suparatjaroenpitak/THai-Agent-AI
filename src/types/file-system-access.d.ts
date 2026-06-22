@@ -1,28 +1,27 @@
-interface FileSystemHandle {
-  readonly kind: "file" | "directory";
-  readonly name: string;
-}
+type OpenCodexFileSystemHandle = OpenCodexFileHandle | OpenCodexDirectoryHandle;
 
-interface FileSystemFileHandle extends FileSystemHandle {
+interface OpenCodexFileHandle {
   readonly kind: "file";
+  readonly name: string;
   getFile(): Promise<File>;
-  createWritable(): Promise<FileSystemWritableFileStream>;
+  createWritable(): Promise<OpenCodexWritableFileStream>;
 }
 
-interface FileSystemDirectoryHandle extends FileSystemHandle {
+interface OpenCodexDirectoryHandle {
   readonly kind: "directory";
-  entries(): AsyncIterableIterator<[string, FileSystemHandle]>;
-  values(): AsyncIterableIterator<FileSystemHandle>;
-  getFileHandle(name: string, options?: { create?: boolean }): Promise<FileSystemFileHandle>;
-  getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<FileSystemDirectoryHandle>;
+  readonly name: string;
+  entries(): AsyncIterableIterator<[string, OpenCodexFileSystemHandle]>;
+  values(): AsyncIterableIterator<OpenCodexFileSystemHandle>;
+  getFileHandle(name: string, options?: { create?: boolean }): Promise<OpenCodexFileHandle>;
+  getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<OpenCodexDirectoryHandle>;
 }
 
-interface FileSystemWritableFileStream extends WritableStream {
+interface OpenCodexWritableFileStream extends WritableStream {
   write(data: BufferSource | Blob | string): Promise<void>;
   seek(position: number): Promise<void>;
   truncate(size: number): Promise<void>;
 }
 
 interface Window {
-  showDirectoryPicker?: (options?: { id?: string; mode?: "read" | "readwrite" }) => Promise<FileSystemDirectoryHandle>;
+  showDirectoryPicker?: (options?: { id?: string; mode?: "read" | "readwrite" }) => Promise<OpenCodexDirectoryHandle>;
 }

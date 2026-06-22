@@ -8,7 +8,7 @@ const metrics = [
   { label: "Cheapest", value: "DeepSeek V3", icon: WalletCards, tone: "text-emerald-300" },
   { label: "Fallback", value: "Qwen3", icon: GitCompareArrows, tone: "text-amber-300" },
   { label: "Latency", value: "618 ms", icon: Gauge, tone: "text-sky-300" },
-  { label: "Balance", value: "4 pools", icon: Activity, tone: "text-coral-300" }
+  { label: "Balance", value: "4 pools", icon: Activity, tone: "text-rose-300" }
 ];
 
 export function ProviderRouting() {

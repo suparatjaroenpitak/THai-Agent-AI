@@ -65,7 +65,14 @@ export const supportedProviderGroups = [
   }
 ];
 
-export const fileTree = [
+export type FileTreeNode = {
+  name: string;
+  type: "file" | "folder";
+  badge?: string;
+  children?: FileTreeNode[];
+};
+
+export const fileTree: FileTreeNode[] = [
   {
     name: "opencodex",
     type: "folder",
@@ -92,7 +99,7 @@ export const fileTree = [
       { name: "README.md", type: "file" }
     ]
   }
-] as const;
+];
 
 export const openTabs = [
   "src/ai/langgraph.ts",
