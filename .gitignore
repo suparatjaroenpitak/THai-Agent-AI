@@ -1,0 +1,12 @@
+.next
+.turbo
+node_modules
+dist
+coverage
+.env
+.env.*
+!.env.example
+*.log
+Dockerfile.local
+tmp
+.DS_Store

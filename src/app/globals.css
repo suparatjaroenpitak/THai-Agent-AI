@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 42 24% 96%;
+    --foreground: 220 13% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 9%;
+    --primary: 157 56% 35%;
+    --primary-foreground: 148 38% 97%;
+    --secondary: 41 72% 88%;
+    --secondary-foreground: 222 18% 13%;
+    --muted: 35 18% 90%;
+    --muted-foreground: 215 10% 43%;
+    --accent: 196 80% 45%;
+    --accent-foreground: 205 40% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 35 14% 81%;
+    --input: 35 14% 81%;
+    --ring: 158 68% 39%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 210 7% 7%;
+    --foreground: 60 12% 94%;
+    --card: 210 6% 10%;
+    --card-foreground: 60 12% 94%;
+    --popover: 210 6% 10%;
+    --popover-foreground: 60 12% 94%;
+    --primary: 151 65% 60%;
+    --primary-foreground: 160 28% 10%;
+    --secondary: 32 50% 26%;
+    --secondary-foreground: 45 85% 86%;
+    --muted: 210 6% 15%;
+    --muted-foreground: 150 5% 67%;
+    --accent: 193 78% 57%;
+    --accent-foreground: 200 35% 9%;
+    --destructive: 0 74% 62%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 210 6% 20%;
+    --input: 210 6% 20%;
+    --ring: 151 65% 60%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.35);
+  }
+}
+
+@layer utilities {
+  .ide-grid {
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 999px;
+  }
+}
