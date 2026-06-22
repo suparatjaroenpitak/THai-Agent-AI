@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { publishWorkerEvent } from "@/lib/redis";
+import { runTerminalCommand } from "@/workspace/terminal";
 
 export const runtime = "nodejs";
 
@@ -12,17 +12,6 @@ const terminalRequestSchema = z.object({
 
 export async function POST(request: Request) {
   const body = terminalRequestSchema.parse(await request.json());
-  const id = crypto.randomUUID();
-
-  await publishWorkerEvent("opencodex:terminal", {
-    id,
-    type: "terminal.command",
-    ...body,
-    createdAt: new Date().toISOString()
-  }).catch(() => undefined);
-
-  return NextResponse.json({
-    id,
-    status: "queued"
-  });
+  const result = await runTerminalCommand(body);
+  return NextResponse.json(result);
 }

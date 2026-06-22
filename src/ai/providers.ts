@@ -1,5 +1,3 @@
-import { env } from "@/env";
-
 export type ProviderKind =
   | "deepseek"
   | "qwen"
@@ -29,6 +27,9 @@ export type ModelProfile = {
   outputCostPerMillion: number;
   tags: Array<"coding" | "reasoning" | "fast" | "cheap" | "long-context" | "tool-use">;
 };
+
+const defaultCompatibleBaseUrl = "https://api.deepseek.com/v1";
+const defaultCompatibleModel = "deepseek-chat";
 
 export const modelCatalog: ModelProfile[] = [
   {
@@ -95,7 +96,7 @@ export const modelCatalog: ModelProfile[] = [
     id: "internlm3-latest",
     label: "InternLM",
     provider: "openai_compatible",
-    baseUrl: env.DEFAULT_PROVIDER_BASE_URL,
+    baseUrl: defaultCompatibleBaseUrl,
     contextWindow: 32000,
     inputCostPerMillion: 0.1,
     outputCostPerMillion: 0.4,
@@ -105,7 +106,7 @@ export const modelCatalog: ModelProfile[] = [
     id: "yi-large",
     label: "Yi",
     provider: "openai_compatible",
-    baseUrl: env.DEFAULT_PROVIDER_BASE_URL,
+    baseUrl: defaultCompatibleBaseUrl,
     contextWindow: 32000,
     inputCostPerMillion: 0.3,
     outputCostPerMillion: 0.3,
@@ -115,7 +116,7 @@ export const modelCatalog: ModelProfile[] = [
     id: "baichuan4",
     label: "Baichuan",
     provider: "openai_compatible",
-    baseUrl: env.DEFAULT_PROVIDER_BASE_URL,
+    baseUrl: defaultCompatibleBaseUrl,
     contextWindow: 32000,
     inputCostPerMillion: 0.3,
     outputCostPerMillion: 1,
@@ -192,10 +193,10 @@ export const modelCatalog: ModelProfile[] = [
     tags: ["fast", "cheap"]
   },
   {
-    id: env.DEFAULT_MODEL,
+    id: defaultCompatibleModel,
     label: "OpenAI Compatible API",
     provider: "openai_compatible",
-    baseUrl: env.DEFAULT_PROVIDER_BASE_URL,
+    baseUrl: defaultCompatibleBaseUrl,
     contextWindow: 128000,
     inputCostPerMillion: 0,
     outputCostPerMillion: 0,

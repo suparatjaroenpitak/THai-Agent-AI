@@ -7,10 +7,12 @@ import { commandPaletteItems } from "@/components/opencodex/data";
 
 export function CommandPalette({
   open,
-  onOpenChange
+  onOpenChange,
+  onSelect
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSelect?: (label: string) => void;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -32,6 +34,10 @@ export function CommandPalette({
             return (
               <button
                 key={item.label}
+                onClick={() => {
+                  onSelect?.(item.label);
+                  onOpenChange(false);
+                }}
                 className="flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm hover:bg-white/[0.06]"
               >
                 <Icon className="size-4 text-emerald-300" />

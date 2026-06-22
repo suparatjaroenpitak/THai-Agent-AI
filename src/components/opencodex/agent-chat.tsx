@@ -1,32 +1,45 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Bot, CheckCircle2, Circle, Loader2, Send, Sparkles, Wrench } from "lucide-react";
+import { Bot, CheckCircle2, Circle, Loader2, Send, Sparkles, Wrench, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { agentWorkflow, toolGroups } from "@/components/opencodex/data";
+import type { ModelConfig } from "@/components/opencodex/types";
 
 type ChatMessage = {
   role: "user" | "assistant" | "tool";
   content: string;
 };
 
+export type WorkflowStep = {
+  role: string;
+  status: "done" | "active" | "queued" | "failed";
+  content: string;
+};
+
 const initialMessages: ChatMessage[] = [
   {
     role: "assistant",
-    content: "Planner created a workflow for local project analysis, model routing, code changes, tests, and deploy."
-  },
-  {
-    role: "tool",
-    content: "Indexed README, package manifests, source files, git history, docs, and dependency graph."
+    content: "Ready. Select a workspace, configure a model, then ask the agent to inspect or change the project."
   }
 ];
 
-export function AgentChat() {
+export function AgentChat({
+  workspaceId,
+  activePath,
+  modelConfig,
+  onWorkflowSteps
+}: {
+  workspaceId: string;
+  activePath?: string;
+  modelConfig: ModelConfig;
+  onWorkflowSteps?: (steps: WorkflowStep[]) => void;
+}) {
   const [messages, setMessages] = useState(initialMessages);
-  const [prompt, setPrompt] = useState("Refactor auth flow, run tests, fix errors, then create a PR.");
+  const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
 
   const activeAgent = useMemo(() => agentWorkflow.find((agent) => agent.status === "active"), []);
@@ -44,11 +57,20 @@ export function AgentChat() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: userPrompt,
-          workspaceId: "demo-workspace",
-          mode: "auto"
+          workspaceId,
+          activePath,
+          mode: "coding",
+          model: {
+            model: modelConfig.model,
+            baseUrl: modelConfig.baseUrl,
+            apiKey: modelConfig.apiKey || undefined
+          }
         })
       });
-      const data = (await response.json()) as { message?: string };
+      const data = (await response.json()) as { message?: string; steps?: WorkflowStep[] };
+      if (Array.isArray(data.steps)) {
+        onWorkflowSteps?.(data.steps);
+      }
       setMessages((current) => [
         ...current,
         {
@@ -61,7 +83,7 @@ export function AgentChat() {
         ...current,
         {
           role: "assistant",
-          content: "The local API is not running yet. Start Bun/Next to stream real agent events."
+          content: "Agent request failed. Check the model key, base URL, and selected workspace."
         }
       ]);
     } finally {
@@ -115,6 +137,7 @@ export function AgentChat() {
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
           className="min-h-20 resize-none border-white/10 bg-black/20 text-xs"
+          placeholder="Ask the agent to inspect, edit, test, or prepare a Git change"
         />
         <div className="mt-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
@@ -131,7 +154,16 @@ export function AgentChat() {
   );
 }
 
-export function WorkflowPanel() {
+export function WorkflowPanel({ steps = [] }: { steps?: WorkflowStep[] }) {
+  const renderedSteps: Array<{ role: string; status: "done" | "active" | "queued" | "failed"; detail: string }> =
+    steps.length > 0
+      ? steps.map((step) => ({
+          role: step.role,
+          status: step.status,
+          detail: step.content
+        }))
+      : agentWorkflow;
+
   return (
     <div className="h-full overflow-auto bg-[#181a1c] p-3 scrollbar-thin">
       <div className="mb-3 flex items-center justify-between">
@@ -139,11 +171,13 @@ export function WorkflowPanel() {
         <Badge variant="info">LangGraph</Badge>
       </div>
       <div className="space-y-2">
-        {agentWorkflow.map((agent) => (
+        {renderedSteps.map((agent) => (
           <div key={agent.role} className="flex gap-3 rounded-md border border-white/10 bg-white/[0.025] p-2">
             <div className="pt-0.5">
               {agent.status === "done" ? (
                 <CheckCircle2 className="size-4 text-emerald-300" />
+              ) : agent.status === "failed" ? (
+                <XCircle className="size-4 text-rose-300" />
               ) : agent.status === "active" ? (
                 <Loader2 className="size-4 animate-spin text-amber-300" />
               ) : (

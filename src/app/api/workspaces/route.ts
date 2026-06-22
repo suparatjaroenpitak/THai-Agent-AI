@@ -1,41 +1,34 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createDefaultSandboxSpec } from "@/workspace/cloud-sandbox";
+import { bindLocalWorkspace, cloneGithubWorkspace, listWorkspaces } from "@/workspace/server-project";
 
 export const runtime = "nodejs";
 
-const createWorkspaceSchema = z.object({
-  name: z.string().min(1),
-  kind: z.enum(["local", "desktop_agent", "github", "cloud"]).default("cloud"),
-  repository: z.string().optional()
-});
+const createWorkspaceSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("local"),
+    name: z.string().optional(),
+    path: z.string().min(1)
+  }),
+  z.object({
+    kind: z.literal("github"),
+    name: z.string().optional(),
+    repository: z.string().min(1)
+  })
+]);
 
 export async function GET() {
   return NextResponse.json({
-    workspaces: [
-      {
-        id: "demo-workspace",
-        name: "OpenCodex Demo",
-        kind: "cloud",
-        branch: "main",
-        sandbox: createDefaultSandboxSpec("demo-workspace")
-      }
-    ]
+    workspaces: await listWorkspaces()
   });
 }
 
 export async function POST(request: Request) {
   const body = createWorkspaceSchema.parse(await request.json());
-  const id = crypto.randomUUID();
+  const workspace =
+    body.kind === "local"
+      ? await bindLocalWorkspace({ name: body.name, rootPath: body.path })
+      : await cloneGithubWorkspace({ name: body.name, repository: body.repository });
 
-  return NextResponse.json(
-    {
-      workspace: {
-        id,
-        ...body,
-        sandbox: body.kind === "cloud" ? createDefaultSandboxSpec(id) : null
-      }
-    },
-    { status: 201 }
-  );
+  return NextResponse.json({ workspace }, { status: 201 });
 }

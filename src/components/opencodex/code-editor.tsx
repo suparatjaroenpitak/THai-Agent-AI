@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { sampleCode } from "@/components/opencodex/data";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react").then((mod) => mod.Editor), {
   ssr: false,
@@ -12,13 +11,26 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react").then((mod) => 
   )
 });
 
-export function CodeEditor() {
+export function CodeEditor({
+  path,
+  language,
+  value,
+  onChange
+}: {
+  path: string;
+  language: string;
+  value: string;
+  onChange?: (value: string) => void;
+}) {
   return (
     <MonacoEditor
+      key={path}
       height="100%"
-      defaultLanguage="typescript"
-      defaultValue={sampleCode}
+      path={path}
+      defaultLanguage={language}
+      defaultValue={value}
       theme="vs-dark"
+      onChange={(nextValue) => onChange?.(nextValue ?? "")}
       options={{
         fontSize: 13,
         fontLigatures: true,
