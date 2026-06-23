@@ -27,5 +27,27 @@
     "status": "ready",
     "createdAt": "2026-06-23T14:28:28.485Z",
     "updatedAt": "2026-06-23T14:28:28.485Z"
+  },
+  {
+    "id": "github-1fd88d6455-377c63ac",
+    "name": "automation",
+    "kind": "github",
+    "rootPath": "D:\\แอพใช้งาน\\ai agent\\THai-Agent-AI\\.agents\\workspaces\\automation.git-fa2987ebf4",
+    "repository": "https://github.com/suparatjaroenpitak/automation.git",
+    "branch": "main",
+    "status": "cloning",
+    "createdAt": "2026-06-23T15:05:20.726Z",
+    "updatedAt": "2026-06-23T15:05:20.726Z"
+  },
+  {
+    "id": "github-1fd88d6455-bdfffaf5",
+    "name": "automation",
+    "kind": "github",
+    "rootPath": "D:\\แอพใช้งาน\\ai agent\\THai-Agent-AI\\.agents\\workspaces\\automation.git-dd5a40562c",
+    "repository": "https://github.com/suparatjaroenpitak/automation.git",
+    "branch": "main",
+    "status": "cloning",
+    "createdAt": "2026-06-23T15:05:34.027Z",
+    "updatedAt": "2026-06-23T15:05:34.027Z"
   }
 ]
