@@ -17,7 +17,9 @@ import {
   SplitSquareHorizontal,
   Sun,
   Terminal,
-  UploadCloud
+  UploadCloud,
+  X,
+  UserCircle
 } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useTheme } from "next-themes";
@@ -39,10 +41,10 @@ import type { EditorFile, ModelConfig, WorkspaceRecord, WorkspaceTreeNode } from
 const railItems = [
   { label: "Explorer", icon: Files },
   { label: "Search", icon: Search },
-  { label: "Agents", icon: Bot },
-  { label: "GitHub", icon: GitPullRequestArrow },
+  { label: "Source Control", icon: GitPullRequestArrow },
+  { label: "Run and Debug", icon: Play },
   { label: "Sandbox", icon: Boxes },
-  { label: "Terminal", icon: Terminal }
+  { label: "AI Agents", icon: Bot },
 ] as const;
 
 const modelStorageKey = "opencodex.modelConfig";
@@ -148,6 +150,22 @@ export function OpenCodexShell() {
     [activeWorkspaceId, workspaces]
   );
   const isDirty = activeFile ? dirtyFiles[activeFile] : false;
+
+  function closeFileTab(path: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setOpenFileTabs((currentTabs) => {
+      const newTabs = currentTabs.filter((t) => t !== path);
+      if (activeFile === path) {
+        if (newTabs.length > 0) {
+          void openFile(newTabs[newTabs.length - 1]);
+        } else {
+          setActiveFile("");
+          setEditorFile(emptyEditorFile);
+        }
+      }
+      return newTabs;
+    });
+  }
 
   useEffect(() => {
     setThemeReady(true);
@@ -402,12 +420,12 @@ export function OpenCodexShell() {
       return;
     }
 
-    if (label === "Agents") {
+    if (label === "AI Agents") {
       setInspectorTab("workflow");
       return;
     }
 
-    if (label === "GitHub") {
+    if (label === "Source Control") {
       void refreshGitStatus();
       return;
     }
@@ -563,7 +581,7 @@ export function OpenCodexShell() {
               </Button>
               <Button variant="chrome" size="sm" onClick={() => setCommandOpen(true)}>
                 <Command className="size-3.5" />
-                <span className="hidden sm:inline">Command</span>
+                <span className="hidden sm:inline">Command Palette</span>
               </Button>
               <Button variant="chrome" size="sm" onClick={() => void saveActiveFile()} disabled={!activeFile || !isDirty}>
                 <Save className="size-3.5" />
@@ -677,7 +695,7 @@ export function OpenCodexShell() {
                       <TerminalPanel lines={terminalLines} busy={terminalBusy} onRunCommand={runTerminalCommand} />
                     </TabsContent>
                     <TabsContent value="problems" className="m-0 min-h-0 flex-1 p-3 text-xs text-zinc-500">
-                      {isDirty ? `${editorFile.path} has unsaved changes.` : `No active diagnostics for ${editorFile.path || "workspace"}`}
+                    {isDirty ? `${editorFile.path} has unsaved changes.` : `No active problems.`}
                     </TabsContent>
                     <TabsContent value="diff" className="m-0 min-h-0 flex-1 overflow-auto p-3">
                       <pre className="whitespace-pre-wrap text-xs leading-5 text-zinc-400">{gitOutput}</pre>

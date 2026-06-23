@@ -18,5 +18,23 @@
     "status": "ready",
     "createdAt": "2026-06-22T23:10:22.363Z",
     "updatedAt": "2026-06-22T23:10:22.363Z"
+  },
+  {
+    "id": "local-8ccb022f96",
+    "name": "Free YouTube Transcript Generator",
+    "kind": "local",
+    "rootPath": "D:\\แอพใช้งาน\\Free YouTube Transcript Generator",
+    "status": "ready",
+    "createdAt": "2026-06-23T11:39:37.131Z",
+    "updatedAt": "2026-06-23T11:39:37.131Z"
+  },
+  {
+    "id": "local-2cc449465a",
+    "name": "Atomic-Exports",
+    "kind": "local",
+    "rootPath": "C:\\Users\\ssss\\Desktop\\Atomic-Exports",
+    "status": "ready",
+    "createdAt": "2026-06-23T11:39:14.190Z",
+    "updatedAt": "2026-06-23T11:39:14.190Z"
   }
 ]
