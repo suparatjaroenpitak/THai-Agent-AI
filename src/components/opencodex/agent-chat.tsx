@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { agentWorkflow, toolGroups } from "@/components/opencodex/data";
 import type { ModelConfig, StreamEvent } from "@/components/opencodex/types";
 
@@ -44,6 +45,7 @@ export function AgentChat({
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [prompt, setPrompt] = useState("");
+  const [promptMode, setPromptMode] = useState<"chat" | "agent">("chat");
   const [busy, setBusy] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -230,8 +232,9 @@ export function AgentChat({
     setPrompt("");
 
     // Use streaming chat for direct chat, agent workflow for complex tasks
-    if (userPrompt.startsWith("/agent ") || userPrompt.startsWith("/workflow ")) {
-      void submitAgentWorkflow(userPrompt.replace(/^\/(agent|workflow)\s+/, ""));
+    if (promptMode === "agent" || userPrompt.startsWith("/agent ") || userPrompt.startsWith("/workflow ")) {
+      const cleanPrompt = userPrompt.replace(/^\/(agent|workflow)\s+/, "");
+      void submitAgentWorkflow(cleanPrompt);
     } else {
       void submitStreamingChat(userPrompt);
     }
@@ -346,8 +349,19 @@ export function AgentChat({
         />
         <div className="mt-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-            {busy ? <Loader2 className="size-3 animate-spin" /> : <Circle className="size-3" />}
-            {modelConfig.model}
+            <Select value={promptMode} onValueChange={(val) => setPromptMode(val as "chat" | "agent")}>
+              <SelectTrigger className="h-6 w-32 border-white/10 bg-black/20 text-[10px]">
+                <SelectValue placeholder="Select mode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="chat">Search ทั่วไป</SelectItem>
+                <SelectItem value="agent">AGENT เขียนโค้ด</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="hidden sm:inline-flex items-center gap-1.5 ml-1">
+              {busy ? <Loader2 className="size-3 animate-spin" /> : <Circle className="size-3" />}
+              {modelConfig.model}
+            </span>
           </div>
           <div className="flex items-center gap-1">
             {streaming && (

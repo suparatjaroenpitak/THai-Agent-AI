@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, BrainCircuit, CircleCheck, CircleX, Cpu, Download, Gauge, Loader2 } from "lucide-react";
+import { Activity, BrainCircuit, CircleCheck, CircleX, Cpu, Download, Gauge, Loader2, Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,12 +63,18 @@ export function ProviderRouting({
   async function handlePull() {
     if (!pullModel.trim() || pulling) return;
     setPulling(true);
+    setPullProgress(null);
     try {
       const response = await fetch("/api/ollama/models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model: pullModel.trim() }),
       });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to start pulling model.");
+      }
 
       const reader = response.body?.getReader();
       if (reader) {
@@ -103,9 +109,10 @@ export function ProviderRouting({
       setPullModel("");
       setPullProgress(null);
       await loadModels();
-    } catch {
-      // error handled silently
-      setPullProgress({ status: "Error pulling model", percentage: 0 });
+    } catch (error: any) {
+      let msg = String(error.message || "Error pulling model");
+      if (msg.startsWith("Error: ")) msg = msg.substring(7);
+      setPullProgress({ status: msg, percentage: 0 });
     } finally {
       setPulling(false);
     }
@@ -155,55 +162,39 @@ export function ProviderRouting({
       <div className="space-y-3 border-b border-white/10 p-3">
         <div className="space-y-1.5">
           <label className="text-[11px] uppercase text-zinc-500">Default Model</label>
-          <select
+          <Input
             value={config.model}
             onChange={(e) => patchConfig({ model: e.target.value })}
-            className="h-8 w-full rounded-md border border-white/10 bg-black/20 px-2 text-xs text-zinc-200 outline-none"
-          >
-            {models.filter((m) => !m.tags.includes("embedding")).map((m) => (
-              <option key={m.id} value={m.id} className="bg-[#1b1d1f]">{m.label} ({m.parameterSize})</option>
-            ))}
-            <option value={config.model} className="bg-[#1b1d1f]">{config.model}</option>
-          </select>
+            className="h-8 border-white/10 bg-black/20 text-xs text-zinc-200"
+            placeholder="e.g. qwen2.5-coder"
+          />
         </div>
         <div className="space-y-1.5">
           <label className="text-[11px] uppercase text-zinc-500">Reasoning Model</label>
-          <select
+          <Input
             value={config.reasoningModel}
             onChange={(e) => patchConfig({ reasoningModel: e.target.value })}
-            className="h-8 w-full rounded-md border border-white/10 bg-black/20 px-2 text-xs text-zinc-200 outline-none"
-          >
-            {models.filter((m) => !m.tags.includes("embedding")).map((m) => (
-              <option key={m.id} value={m.id} className="bg-[#1b1d1f]">{m.label} ({m.parameterSize})</option>
-            ))}
-            <option value={config.reasoningModel} className="bg-[#1b1d1f]">{config.reasoningModel}</option>
-          </select>
+            className="h-8 border-white/10 bg-black/20 text-xs text-zinc-200"
+            placeholder="e.g. deepseek-r1"
+          />
         </div>
         <div className="space-y-1.5">
           <label className="text-[11px] uppercase text-zinc-500">Coding Model</label>
-          <select
+          <Input
             value={config.codingModel}
             onChange={(e) => patchConfig({ codingModel: e.target.value })}
-            className="h-8 w-full rounded-md border border-white/10 bg-black/20 px-2 text-xs text-zinc-200 outline-none"
-          >
-            {models.filter((m) => !m.tags.includes("embedding")).map((m) => (
-              <option key={m.id} value={m.id} className="bg-[#1b1d1f]">{m.label} ({m.parameterSize})</option>
-            ))}
-            <option value={config.codingModel} className="bg-[#1b1d1f]">{config.codingModel}</option>
-          </select>
+            className="h-8 border-white/10 bg-black/20 text-xs text-zinc-200"
+            placeholder="e.g. qwen2.5-coder"
+          />
         </div>
         <div className="space-y-1.5">
           <label className="text-[11px] uppercase text-zinc-500">Embedding Model</label>
-          <select
+          <Input
             value={config.embedModel}
             onChange={(e) => patchConfig({ embedModel: e.target.value })}
-            className="h-8 w-full rounded-md border border-white/10 bg-black/20 px-2 text-xs text-zinc-200 outline-none"
-          >
-            {models.filter((m) => m.tags.includes("embedding")).map((m) => (
-              <option key={m.id} value={m.id} className="bg-[#1b1d1f]">{m.label} ({m.parameterSize})</option>
-            ))}
-            <option value={config.embedModel} className="bg-[#1b1d1f]">{config.embedModel}</option>
-          </select>
+            className="h-8 border-white/10 bg-black/20 text-xs text-zinc-200"
+            placeholder="e.g. nomic-embed-text"
+          />
         </div>
       </div>
 
@@ -247,39 +238,58 @@ export function ProviderRouting({
       <div className="min-h-0 flex-1 overflow-auto p-3 scrollbar-thin">
         <div className="space-y-2">
           {models.map((model) => (
-            <button
+            <div
               key={model.id}
-              onClick={() => {
-                if (model.tags.includes("embedding")) {
-                  patchConfig({ embedModel: model.id });
-                } else {
-                  patchConfig({ model: model.id, codingModel: model.id });
-                }
-              }}
-              className={`w-full rounded-md border p-2 text-left transition-colors ${
+              className={`group w-full rounded-md border text-left transition-colors relative flex flex-col ${
                 model.id === config.model || model.id === config.codingModel || model.id === config.embedModel
                   ? "border-emerald-400/40 bg-emerald-400/10"
                   : "border-white/10 bg-white/[0.025] hover:bg-white/[0.06]"
               }`}
             >
-              <div className="mb-1 flex min-w-0 items-center justify-between gap-2">
-                <span className="truncate text-xs font-semibold text-zinc-200">{model.label}</span>
-                <Badge variant="outline" className="border-white/10 text-[10px] text-zinc-400">
-                  {model.parameterSize}
-                </Badge>
-              </div>
-              <div className="truncate text-[11px] text-zinc-500">{model.id}</div>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {model.tags.slice(0, 3).map((tag) => (
-                  <span key={tag} className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-zinc-500">
-                    {tag}
+              <button
+                className="w-full text-left p-2 pb-1"
+                onClick={() => {
+                  if (model.tags.includes("embedding")) {
+                    patchConfig({ embedModel: model.id });
+                  } else {
+                    patchConfig({ model: model.id, codingModel: model.id });
+                  }
+                }}
+              >
+                <div className="mb-1 flex min-w-0 items-center justify-between gap-2">
+                  <span className="truncate text-xs font-semibold text-zinc-200">{model.label}</span>
+                  <Badge variant="outline" className="border-white/10 text-[10px] text-zinc-400">
+                    {model.parameterSize}
+                  </Badge>
+                </div>
+              </button>
+              
+              <div className="px-2 pb-2">
+                <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+                  <span className="truncate">{model.id}</span>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(model.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 hover:text-emerald-300 transition-opacity p-0.5 rounded-sm bg-white/5"
+                    title="Copy Model Name"
+                  >
+                    <Copy className="size-3" />
+                  </button>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {model.tags.slice(0, 3).map((tag) => (
+                    <span key={tag} className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-zinc-500">
+                      {tag}
+                    </span>
+                  ))}
+                  <span className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-zinc-500">
+                    {formatSize(model.sizeBytes)}
                   </span>
-                ))}
-                <span className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-zinc-500">
-                  {formatSize(model.sizeBytes)}
-                </span>
+                </div>
               </div>
-            </button>
+            </div>
           ))}
           {models.length === 0 && ollamaStatus !== "loading" ? (
             <div className="rounded-md border border-white/10 bg-white/[0.025] p-3 text-xs text-zinc-500">

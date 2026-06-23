@@ -151,19 +151,27 @@ export async function checkOllamaHealth(): Promise<{
 }
 
 /** Pull a model from Ollama registry */
-export async function pullOllamaModel(modelName: string): Promise<ReadableStream<Uint8Array>> {
-  const response = await fetch(`${ollamaHost()}/api/pull`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: modelName, stream: true }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to pull ${modelName}: HTTP ${response.status}`);
+  export async function pullOllamaModel(modelName: string): Promise<ReadableStream<Uint8Array>> {
+    const response = await fetch(`${ollamaHost()}/api/pull`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: modelName, stream: true }),
+    });
+  
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}`;
+      try {
+        const body = await response.json();
+        if (body.error) errorMessage = body.error;
+      } catch {
+        const text = await response.text().catch(() => "");
+        if (text) errorMessage += `: ${text}`;
+      }
+      throw new Error(errorMessage);
+    }
+  
+    return response.body!;
   }
-
-  return response.body!;
-}
 
 /** Auto-pull missing models if AUTO_PULL_MODEL is enabled */
 export async function autoPullMissingModels(): Promise<string[]> {
