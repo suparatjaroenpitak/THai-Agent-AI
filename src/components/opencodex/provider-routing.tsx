@@ -1,84 +1,126 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Activity, BrainCircuit, Gauge, KeyRound, WalletCards } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Activity, BrainCircuit, CircleCheck, CircleX, Cpu, Download, Gauge, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { ModelConfig } from "@/components/opencodex/types";
+import type { ModelConfig, OllamaModelInfo } from "@/components/opencodex/types";
 
 export const defaultModelConfig: ModelConfig = {
-  model: "deepseek-chat",
-  baseUrl: "https://api.deepseek.com/v1",
-  apiKey: ""
+  model: "qwen2.5-coder",
+  reasoningModel: "deepseek-r1",
+  codingModel: "qwen2.5-coder",
+  embedModel: "nomic-embed-text",
 };
 
-type ProviderItem = {
-  id: string;
-  label: string;
-  provider: string;
-  baseUrl: string;
-  tags: string[];
-};
-
-type ProvidersResponse = {
-  providers: ProviderItem[];
-  routing?: {
-    primary?: ProviderItem;
-    fallbacks?: ProviderItem[];
+type ModelsResponse = {
+  models: OllamaModelInfo[];
+  config?: {
+    host: string;
+    defaultModel: string;
+    reasoningModel: string;
+    embedModel: string;
   };
+  error?: string;
 };
 
 export function ProviderRouting({
   config,
-  onChange
+  onChange,
 }: {
   config: ModelConfig;
   onChange: (config: ModelConfig) => void;
 }) {
-  const [providers, setProviders] = useState<ProviderItem[]>([]);
+  const [models, setModels] = useState<OllamaModelInfo[]>([]);
+  const [ollamaStatus, setOllamaStatus] = useState<"loading" | "connected" | "error">("loading");
+  const [pullModel, setPullModel] = useState("");
+  const [pulling, setPulling] = useState(false);
 
   useEffect(() => {
-    let disposed = false;
-
-    fetch("/api/providers")
-      .then((response) => response.json() as Promise<ProvidersResponse>)
-      .then((data) => {
-        if (!disposed) setProviders(data.providers ?? []);
-      })
-      .catch(() => {
-        if (!disposed) setProviders([]);
-      });
-
-    return () => {
-      disposed = true;
-    };
+    loadModels();
   }, []);
 
-  const selectedProvider = useMemo(
-    () => providers.find((provider) => provider.id === config.model && provider.baseUrl === config.baseUrl) ?? providers[0],
-    [config.baseUrl, config.model, providers]
-  );
+  async function loadModels() {
+    setOllamaStatus("loading");
+    try {
+      const response = await fetch("/api/ollama/models");
+      const data = (await response.json()) as ModelsResponse;
+      if (data.error) {
+        setOllamaStatus("error");
+        setModels([]);
+      } else {
+        setOllamaStatus("connected");
+        setModels(data.models ?? []);
+      }
+    } catch {
+      setOllamaStatus("error");
+      setModels([]);
+    }
+  }
 
-  const metrics = [
-    { label: "Model", value: selectedProvider?.label ?? config.model, icon: BrainCircuit, tone: "text-emerald-300" },
-    { label: "Provider", value: selectedProvider?.provider ?? "custom", icon: Activity, tone: "text-amber-300" },
-    { label: "Endpoint", value: config.baseUrl.replace(/^https?:\/\//, ""), icon: Gauge, tone: "text-sky-300" },
-    { label: "Key", value: config.apiKey ? "browser" : "empty", icon: KeyRound, tone: config.apiKey ? "text-emerald-300" : "text-rose-300" }
-  ];
+  async function handlePull() {
+    if (!pullModel.trim() || pulling) return;
+    setPulling(true);
+    try {
+      const response = await fetch("/api/ollama/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: pullModel.trim() }),
+      });
+
+      const reader = response.body?.getReader();
+      if (reader) {
+        const decoder = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          decoder.decode(value, { stream: true });
+        }
+        reader.releaseLock();
+      }
+
+      setPullModel("");
+      await loadModels();
+    } catch {
+      // error handled silently
+    } finally {
+      setPulling(false);
+    }
+  }
 
   function patchConfig(patch: Partial<ModelConfig>) {
     onChange({ ...config, ...patch });
   }
 
+  function formatSize(bytes: number): string {
+    const gb = bytes / (1024 * 1024 * 1024);
+    if (gb >= 1) return `${gb.toFixed(1)} GB`;
+    return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+  }
+
+  const metrics = [
+    {
+      label: "Status",
+      value: ollamaStatus === "connected" ? "Connected" : ollamaStatus === "loading" ? "Checking..." : "Offline",
+      icon: ollamaStatus === "connected" ? CircleCheck : ollamaStatus === "loading" ? Loader2 : CircleX,
+      tone: ollamaStatus === "connected" ? "text-emerald-300" : ollamaStatus === "loading" ? "text-amber-300" : "text-rose-300",
+    },
+    { label: "Provider", value: "Ollama", icon: Cpu, tone: "text-sky-300" },
+    { label: "Models", value: `${models.length} installed`, icon: BrainCircuit, tone: "text-amber-300" },
+    { label: "Endpoint", value: "localhost:11434", icon: Gauge, tone: "text-sky-300" },
+  ];
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#181a1c]">
+      {/* Status grid */}
       <div className="grid grid-cols-2 gap-2 border-b border-white/10 p-3">
         {metrics.map((metric) => {
           const Icon = metric.icon;
           return (
             <div key={metric.label} className="min-w-0 rounded-md border border-white/10 bg-white/[0.025] p-2">
               <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-                <Icon className={`size-3.5 ${metric.tone}`} />
+                <Icon className={`size-3.5 ${metric.tone} ${metric.icon === Loader2 ? "animate-spin" : ""}`} />
                 {metric.label}
               </div>
               <div className="mt-1 truncate text-xs font-semibold text-zinc-100">{metric.value}</div>
@@ -87,66 +129,123 @@ export function ProviderRouting({
         })}
       </div>
 
+      {/* Model selection */}
       <div className="space-y-3 border-b border-white/10 p-3">
         <div className="space-y-1.5">
-          <label className="text-[11px] uppercase text-zinc-500">Model</label>
-          <Input
+          <label className="text-[11px] uppercase text-zinc-500">Default Model</label>
+          <select
             value={config.model}
-            onChange={(event) => patchConfig({ model: event.target.value })}
-            className="h-8 border-white/10 bg-black/20 text-xs"
-          />
+            onChange={(e) => patchConfig({ model: e.target.value })}
+            className="h-8 w-full rounded-md border border-white/10 bg-black/20 px-2 text-xs text-zinc-200 outline-none"
+          >
+            {models.filter((m) => !m.tags.includes("embedding")).map((m) => (
+              <option key={m.id} value={m.id} className="bg-[#1b1d1f]">{m.label} ({m.parameterSize})</option>
+            ))}
+            <option value={config.model} className="bg-[#1b1d1f]">{config.model}</option>
+          </select>
         </div>
         <div className="space-y-1.5">
-          <label className="text-[11px] uppercase text-zinc-500">Base URL</label>
-          <Input
-            value={config.baseUrl}
-            onChange={(event) => patchConfig({ baseUrl: event.target.value })}
-            className="h-8 border-white/10 bg-black/20 text-xs"
-          />
+          <label className="text-[11px] uppercase text-zinc-500">Reasoning Model</label>
+          <select
+            value={config.reasoningModel}
+            onChange={(e) => patchConfig({ reasoningModel: e.target.value })}
+            className="h-8 w-full rounded-md border border-white/10 bg-black/20 px-2 text-xs text-zinc-200 outline-none"
+          >
+            {models.filter((m) => !m.tags.includes("embedding")).map((m) => (
+              <option key={m.id} value={m.id} className="bg-[#1b1d1f]">{m.label} ({m.parameterSize})</option>
+            ))}
+            <option value={config.reasoningModel} className="bg-[#1b1d1f]">{config.reasoningModel}</option>
+          </select>
         </div>
         <div className="space-y-1.5">
-          <label className="text-[11px] uppercase text-zinc-500">API Key</label>
-          <Input
-            type="password"
-            value={config.apiKey}
-            onChange={(event) => patchConfig({ apiKey: event.target.value })}
-            className="h-8 border-white/10 bg-black/20 text-xs"
-            placeholder="sk-..."
-          />
+          <label className="text-[11px] uppercase text-zinc-500">Coding Model</label>
+          <select
+            value={config.codingModel}
+            onChange={(e) => patchConfig({ codingModel: e.target.value })}
+            className="h-8 w-full rounded-md border border-white/10 bg-black/20 px-2 text-xs text-zinc-200 outline-none"
+          >
+            {models.filter((m) => !m.tags.includes("embedding")).map((m) => (
+              <option key={m.id} value={m.id} className="bg-[#1b1d1f]">{m.label} ({m.parameterSize})</option>
+            ))}
+            <option value={config.codingModel} className="bg-[#1b1d1f]">{config.codingModel}</option>
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-[11px] uppercase text-zinc-500">Embedding Model</label>
+          <select
+            value={config.embedModel}
+            onChange={(e) => patchConfig({ embedModel: e.target.value })}
+            className="h-8 w-full rounded-md border border-white/10 bg-black/20 px-2 text-xs text-zinc-200 outline-none"
+          >
+            {models.filter((m) => m.tags.includes("embedding")).map((m) => (
+              <option key={m.id} value={m.id} className="bg-[#1b1d1f]">{m.label} ({m.parameterSize})</option>
+            ))}
+            <option value={config.embedModel} className="bg-[#1b1d1f]">{config.embedModel}</option>
+          </select>
         </div>
       </div>
 
+      {/* Pull model */}
+      <div className="border-b border-white/10 p-3">
+        <label className="mb-1.5 block text-[11px] uppercase text-zinc-500">Pull New Model</label>
+        <div className="flex gap-2">
+          <Input
+            value={pullModel}
+            onChange={(e) => setPullModel(e.target.value)}
+            className="h-8 flex-1 border-white/10 bg-black/20 text-xs"
+            placeholder="e.g. llama3.2, phi4, gemma3"
+            onKeyDown={(e) => { if (e.key === "Enter") handlePull(); }}
+          />
+          <Button size="sm" onClick={handlePull} disabled={pulling || !pullModel.trim()}>
+            {pulling ? <Loader2 className="size-3 animate-spin" /> : <Download className="size-3" />}
+            Pull
+          </Button>
+        </div>
+      </div>
+
+      {/* Installed models list */}
       <div className="min-h-0 flex-1 overflow-auto p-3 scrollbar-thin">
         <div className="space-y-2">
-          {providers.map((provider) => (
+          {models.map((model) => (
             <button
-              key={`${provider.provider}:${provider.id}:${provider.baseUrl}`}
-              onClick={() => patchConfig({ model: provider.id, baseUrl: provider.baseUrl })}
+              key={model.id}
+              onClick={() => {
+                if (model.tags.includes("embedding")) {
+                  patchConfig({ embedModel: model.id });
+                } else {
+                  patchConfig({ model: model.id, codingModel: model.id });
+                }
+              }}
               className={`w-full rounded-md border p-2 text-left transition-colors ${
-                provider.id === config.model && provider.baseUrl === config.baseUrl
+                model.id === config.model || model.id === config.codingModel || model.id === config.embedModel
                   ? "border-emerald-400/40 bg-emerald-400/10"
                   : "border-white/10 bg-white/[0.025] hover:bg-white/[0.06]"
               }`}
             >
               <div className="mb-1 flex min-w-0 items-center justify-between gap-2">
-                <span className="truncate text-xs font-semibold text-zinc-200">{provider.label}</span>
+                <span className="truncate text-xs font-semibold text-zinc-200">{model.label}</span>
                 <Badge variant="outline" className="border-white/10 text-[10px] text-zinc-400">
-                  {provider.provider}
+                  {model.parameterSize}
                 </Badge>
               </div>
-              <div className="truncate text-[11px] text-zinc-500">{provider.id}</div>
+              <div className="truncate text-[11px] text-zinc-500">{model.id}</div>
               <div className="mt-1 flex flex-wrap gap-1">
-                {provider.tags.slice(0, 3).map((tag) => (
+                {model.tags.slice(0, 3).map((tag) => (
                   <span key={tag} className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-zinc-500">
                     {tag}
                   </span>
                 ))}
+                <span className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-zinc-500">
+                  {formatSize(model.sizeBytes)}
+                </span>
               </div>
             </button>
           ))}
-          {providers.length === 0 ? (
+          {models.length === 0 && ollamaStatus !== "loading" ? (
             <div className="rounded-md border border-white/10 bg-white/[0.025] p-3 text-xs text-zinc-500">
-              Provider catalog unavailable
+              {ollamaStatus === "error"
+                ? "Cannot connect to Ollama. Run: ollama serve"
+                : "No models installed. Pull a model to get started."}
             </div>
           ) : null}
         </div>

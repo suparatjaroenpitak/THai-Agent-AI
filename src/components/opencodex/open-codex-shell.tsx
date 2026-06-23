@@ -82,8 +82,9 @@ function parseStoredModelConfig() {
 
     return {
       model: parsed.model || defaultModelConfig.model,
-      baseUrl: parsed.baseUrl || defaultModelConfig.baseUrl,
-      apiKey: parsed.apiKey || ""
+      reasoningModel: parsed.reasoningModel || defaultModelConfig.reasoningModel,
+      codingModel: parsed.codingModel || defaultModelConfig.codingModel,
+      embedModel: parsed.embedModel || defaultModelConfig.embedModel
     };
   } catch {
     return defaultModelConfig;
@@ -436,7 +437,7 @@ export function OpenCodexShell() {
       return;
     }
 
-    if (label === "Add OpenAI-compatible API") {
+    if (label === "Configure Ollama models") {
       setActiveRail("Agents");
       setInspectorTab("models");
       return;

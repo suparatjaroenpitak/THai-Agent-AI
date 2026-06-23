@@ -26,42 +26,45 @@ export type AgentRole =
   | "Coder"
   | "Reviewer"
   | "Tester"
+  | "Debugger"
   | "Security"
+  | "Documentation"
   | "DevOps"
-  | "Database";
+  | "Database"
+  | "Git";
 
 export const agentWorkflow: Array<{
   role: AgentRole;
   status: "done" | "active" | "queued";
   detail: string;
 }> = [
-  { role: "Planner", status: "done", detail: "Scope split into 9 execution tracks" },
-  { role: "Research", status: "done", detail: "Docs and package graph indexed" },
-  { role: "Architect", status: "active", detail: "Choosing sandbox and storage plan" },
-  { role: "Coder", status: "queued", detail: "Waiting for file plan approval" },
-  { role: "Reviewer", status: "queued", detail: "Static risk review" },
-  { role: "Tester", status: "queued", detail: "Vitest and Playwright queue" },
-  { role: "Security", status: "queued", detail: "Secrets and OWASP scan" },
-  { role: "Database", status: "queued", detail: "Migration diff pending" },
-  { role: "DevOps", status: "queued", detail: "Docker deploy recipe pending" }
+  { role: "Planner", status: "done", detail: "Breaking down task into execution steps" },
+  { role: "Research", status: "done", detail: "Indexing workspace files and context" },
+  { role: "Architect", status: "active", detail: "Designing solution architecture" },
+  { role: "Coder", status: "queued", detail: "Generating code changes" },
+  { role: "Reviewer", status: "queued", detail: "Static code review" },
+  { role: "Tester", status: "queued", detail: "Generating test cases" },
+  { role: "Security", status: "queued", detail: "Security audit" },
+  { role: "Documentation", status: "queued", detail: "Updating docs" },
+  { role: "Git", status: "queued", detail: "Preparing commit" }
 ];
 
 export const supportedProviderGroups = [
   {
     name: "Coding",
-    models: ["DeepSeek V3", "Qwen Coder", "Kimi K2", "OpenAI Compatible"]
+    models: ["qwen2.5-coder", "codellama", "starcoder2", "deepseek-coder-v2"]
   },
   {
     name: "Reasoning",
-    models: ["DeepSeek R1", "Qwen3", "GLM-4", "OpenRouter"]
+    models: ["deepseek-r1", "qwen3", "phi4"]
   },
   {
-    name: "Regional",
-    models: ["Moonshot", "MiniMax", "Doubao", "Zhipu", "DashScope", "SiliconFlow"]
+    name: "General",
+    models: ["llama3.2", "mistral", "gemma3"]
   },
   {
-    name: "Open",
-    models: ["InternLM", "Yi", "Baichuan", "Together AI", "Groq"]
+    name: "Embedding",
+    models: ["nomic-embed-text", "mxbai-embed-large"]
   }
 ];
 
@@ -108,6 +111,7 @@ export const openTabs = [
 ];
 
 export const sampleCode = `import { StateGraph, START, END } from "@langchain/langgraph";
+import { runOllamaChat } from "@/ai/model-client";
 
 export async function runOpenCodexWorkflow(input: AgentInput) {
   const graph = new StateGraph(AgentState)
@@ -118,6 +122,8 @@ export async function runOpenCodexWorkflow(input: AgentInput) {
     .addNode("review", reviewerAgent)
     .addNode("test", testerAgent)
     .addNode("fix", debuggerAgent)
+    .addNode("security", securityAgent)
+    .addNode("docs", documentationAgent)
     .addNode("commit", gitAgent)
     .addEdge(START, "planner")
     .addEdge("planner", "research")
@@ -127,6 +133,8 @@ export async function runOpenCodexWorkflow(input: AgentInput) {
     .addEdge("review", "test")
     .addConditionalEdges("test", shouldCommitOrFix)
     .addEdge("fix", "coder")
+    .addEdge("security", "docs")
+    .addEdge("docs", "commit")
     .addEdge("commit", END);
 
   return graph.compile().invoke(input);
@@ -163,47 +171,89 @@ export const workspace = pgTable("workspace", {
 });`;
 
 const apiRouteCode = `import { NextResponse } from "next/server";
+import { runOpenCodexWorkflow } from "@/ai/langgraph";
+import { routeModel } from "@/ai/router";
 
 export async function POST(request: Request) {
   const body = await request.json();
+  const routing = routeModel({ mode: body.mode ?? "auto" });
+  const result = await runOpenCodexWorkflow(body);
 
   return NextResponse.json({
-    message: "Workflow queued for " + (body.prompt ?? "untitled task")
+    message: result.summary,
+    routing,
+    steps: result.steps
   });
 }`;
 
-const workerCode = `export async function runNodeWorker() {
-  console.log("worker online");
-}`;
+const workerCode = `import Redis from "ioredis";
+import { runOpenCodexWorkflow } from "../src/ai/langgraph";
 
-const websocketCode = `import { createServer } from "node:http";
+// Worker subscribes to Redis and executes agent workflows
+const subscriber = new Redis(process.env.REDIS_URL!);
+subscriber.on("message", async (_channel, raw) => {
+  const event = JSON.parse(raw);
+  if (event.type === "agent.workflow.queued") {
+    await runOpenCodexWorkflow({
+      workspaceId: event.workspaceId,
+      prompt: event.prompt,
+      mode: "auto"
+    });
+  }
+});
+await subscriber.subscribe("opencodex:tasks");`;
 
-const server = createServer();
+const websocketCode = `import Redis from "ioredis";
 
-server.listen(3001, () => {
-  console.log("socket server listening on :3001");
+const sockets = new Set<Bun.ServerWebSocket>();
+const subscriber = new Redis(process.env.REDIS_URL!);
+
+subscriber.on("message", (_channel, raw) => {
+  for (const socket of sockets) socket.send(raw);
+});
+
+await subscriber.subscribe("opencodex:events");
+
+Bun.serve({
+  port: Number(process.env.WEBSOCKET_PORT ?? 3001),
+  websocket: {
+    open(socket) { sockets.add(socket); },
+    close(socket) { sockets.delete(socket); },
+    message() {}
+  }
 });`;
 
 const dockerComposeCode = `services:
   postgres:
     image: postgres:16-alpine
-    ports:
-      - "5432:5432"
+    ports: ["5432:5432"]
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"`;
+    ports: ["6379:6379"]
+
+  ollama:
+    image: ollama/ollama:latest
+    ports: ["11434:11434"]
+    volumes: [ollama-data:/root/.ollama]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/"]`;
 
 const readmeCode = `# OpenCodex
 
-Browser-native AI coding agent with workspaces, model routing, MCP, and task execution.
+Browser-native AI coding agent powered by Ollama.
 
-## Local Development
+## Prerequisites
+- Bun v1.1+
+- Ollama running locally
+- PostgreSQL + Redis
 
-1. bun install
-2. bun run db:generate
-3. bun run dev`;
+## Quick Start
+1. ollama pull qwen2.5-coder
+2. bun install
+3. docker compose up -d postgres redis
+4. bun run db:generate
+5. bun run dev`;
 
 export type EditorFile = {
   path: string;
@@ -293,7 +343,7 @@ export const commandPaletteItems = [
   { label: "Run security review", icon: LockKeyhole, section: "Security" },
   { label: "Debug failing tests", icon: Bug, section: "Testing" },
   { label: "Deploy Docker image", icon: Rocket, section: "Deploy" },
-  { label: "Add OpenAI-compatible API", icon: BrainCircuit, section: "Models" },
+  { label: "Configure Ollama models", icon: BrainCircuit, section: "Models" },
   { label: "Run Vitest suite", icon: TestTube2, section: "Testing" },
   { label: "Ask Coder agent", icon: Bot, section: "Chat" }
 ];

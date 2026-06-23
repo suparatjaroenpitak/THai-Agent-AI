@@ -1,205 +1,208 @@
-export type ProviderKind =
-  | "deepseek"
-  | "qwen"
-  | "glm"
-  | "kimi"
-  | "internlm"
-  | "yi"
-  | "baichuan"
-  | "moonshot"
-  | "minimax"
-  | "doubao"
-  | "zhipu"
-  | "openrouter"
-  | "siliconflow"
-  | "dashscope"
-  | "together"
-  | "groq"
-  | "openai_compatible";
+import { env } from "@/env";
+
+// ── Types ───────────────────────────────────────────────────────────────────
+
+export type OllamaModelDetail = {
+  parent_model: string;
+  format: string;
+  family: string;
+  families: string[] | null;
+  parameter_size: string;
+  quantization_level: string;
+};
+
+export type OllamaModel = {
+  name: string;
+  model: string;
+  modified_at: string;
+  size: number;
+  digest: string;
+  details: OllamaModelDetail;
+};
+
+export type OllamaTagsResponse = {
+  models: OllamaModel[];
+};
 
 export type ModelProfile = {
   id: string;
   label: string;
-  provider: ProviderKind;
+  provider: "ollama";
   baseUrl: string;
   contextWindow: number;
-  inputCostPerMillion: number;
-  outputCostPerMillion: number;
-  tags: Array<"coding" | "reasoning" | "fast" | "cheap" | "long-context" | "tool-use">;
+  parameterSize: string;
+  family: string;
+  quantization: string;
+  sizeBytes: number;
+  tags: Array<"coding" | "reasoning" | "fast" | "embedding" | "tool-use" | "general">;
 };
 
-const defaultCompatibleBaseUrl = "https://api.deepseek.com/v1";
-const defaultCompatibleModel = "deepseek-chat";
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
-export const modelCatalog: ModelProfile[] = [
-  {
-    id: "deepseek-chat",
-    label: "DeepSeek V3",
-    provider: "deepseek",
-    baseUrl: "https://api.deepseek.com/v1",
-    contextWindow: 64000,
-    inputCostPerMillion: 0.27,
-    outputCostPerMillion: 1.1,
-    tags: ["coding", "cheap", "tool-use"]
-  },
-  {
-    id: "deepseek-reasoner",
-    label: "DeepSeek R1",
-    provider: "deepseek",
-    baseUrl: "https://api.deepseek.com/v1",
-    contextWindow: 64000,
-    inputCostPerMillion: 0.55,
-    outputCostPerMillion: 2.19,
-    tags: ["reasoning", "coding", "tool-use"]
-  },
-  {
-    id: "qwen3-coder-plus",
-    label: "Qwen Coder",
-    provider: "dashscope",
-    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    contextWindow: 128000,
-    inputCostPerMillion: 0.35,
-    outputCostPerMillion: 1.4,
-    tags: ["coding", "long-context", "tool-use"]
-  },
-  {
-    id: "qwen3-max",
-    label: "Qwen3",
-    provider: "dashscope",
-    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    contextWindow: 128000,
-    inputCostPerMillion: 0.5,
-    outputCostPerMillion: 2,
-    tags: ["reasoning", "long-context"]
-  },
-  {
-    id: "glm-4-plus",
-    label: "GLM-4",
-    provider: "zhipu",
-    baseUrl: "https://open.bigmodel.cn/api/paas/v4",
-    contextWindow: 128000,
-    inputCostPerMillion: 0.7,
-    outputCostPerMillion: 0.7,
-    tags: ["reasoning", "tool-use"]
-  },
-  {
-    id: "kimi-k2",
-    label: "Kimi K2",
-    provider: "moonshot",
-    baseUrl: "https://api.moonshot.cn/v1",
-    contextWindow: 128000,
-    inputCostPerMillion: 0.6,
-    outputCostPerMillion: 2.5,
-    tags: ["coding", "long-context"]
-  },
-  {
-    id: "internlm3-latest",
-    label: "InternLM",
-    provider: "openai_compatible",
-    baseUrl: defaultCompatibleBaseUrl,
-    contextWindow: 32000,
-    inputCostPerMillion: 0.1,
-    outputCostPerMillion: 0.4,
-    tags: ["cheap"]
-  },
-  {
-    id: "yi-large",
-    label: "Yi",
-    provider: "openai_compatible",
-    baseUrl: defaultCompatibleBaseUrl,
-    contextWindow: 32000,
-    inputCostPerMillion: 0.3,
-    outputCostPerMillion: 0.3,
-    tags: ["fast"]
-  },
-  {
-    id: "baichuan4",
-    label: "Baichuan",
-    provider: "openai_compatible",
-    baseUrl: defaultCompatibleBaseUrl,
-    contextWindow: 32000,
-    inputCostPerMillion: 0.3,
-    outputCostPerMillion: 1,
-    tags: ["fast"]
-  },
-  {
-    id: "minimax-text-01",
-    label: "MiniMax",
-    provider: "minimax",
-    baseUrl: "https://api.minimax.chat/v1",
-    contextWindow: 1000000,
-    inputCostPerMillion: 0.2,
-    outputCostPerMillion: 1.1,
-    tags: ["long-context", "cheap"]
-  },
-  {
-    id: "doubao-pro-32k",
-    label: "Doubao",
-    provider: "doubao",
-    baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
-    contextWindow: 32000,
-    inputCostPerMillion: 0.11,
-    outputCostPerMillion: 0.55,
-    tags: ["cheap", "fast"]
-  },
-  {
-    id: "moonshot-v1-128k",
-    label: "Moonshot",
-    provider: "moonshot",
-    baseUrl: "https://api.moonshot.cn/v1",
-    contextWindow: 128000,
-    inputCostPerMillion: 1,
-    outputCostPerMillion: 1,
-    tags: ["long-context"]
-  },
-  {
-    id: "openrouter/auto",
-    label: "OpenRouter Auto",
-    provider: "openrouter",
-    baseUrl: "https://openrouter.ai/api/v1",
-    contextWindow: 200000,
-    inputCostPerMillion: 0.2,
-    outputCostPerMillion: 0.8,
-    tags: ["tool-use", "cheap"]
-  },
-  {
-    id: "siliconflow/qwen",
-    label: "SiliconFlow",
-    provider: "siliconflow",
-    baseUrl: "https://api.siliconflow.cn/v1",
-    contextWindow: 128000,
-    inputCostPerMillion: 0.1,
-    outputCostPerMillion: 0.4,
-    tags: ["cheap", "fast"]
-  },
-  {
-    id: "together/qwen-coder",
-    label: "Together AI",
-    provider: "together",
-    baseUrl: "https://api.together.xyz/v1",
-    contextWindow: 128000,
-    inputCostPerMillion: 0.2,
-    outputCostPerMillion: 0.6,
-    tags: ["coding", "fast"]
-  },
-  {
-    id: "groq/llama-fast",
-    label: "Groq",
-    provider: "groq",
-    baseUrl: "https://api.groq.com/openai/v1",
-    contextWindow: 128000,
-    inputCostPerMillion: 0.05,
-    outputCostPerMillion: 0.08,
-    tags: ["fast", "cheap"]
-  },
-  {
-    id: defaultCompatibleModel,
-    label: "OpenAI Compatible API",
-    provider: "openai_compatible",
-    baseUrl: defaultCompatibleBaseUrl,
-    contextWindow: 128000,
-    inputCostPerMillion: 0,
-    outputCostPerMillion: 0,
-    tags: ["coding", "tool-use"]
+function ollamaHost(): string {
+  return env.OLLAMA_HOST.replace(/\/+$/, "");
+}
+
+function inferTags(modelName: string): ModelProfile["tags"] {
+  const lower = modelName.toLowerCase();
+  const tags: ModelProfile["tags"] = [];
+
+  if (lower.includes("coder") || lower.includes("codellama") || lower.includes("starcoder")) {
+    tags.push("coding");
   }
-];
+  if (lower.includes("r1") || lower.includes("deepseek-r1") || lower.includes("reasoning")) {
+    tags.push("reasoning");
+  }
+  if (lower.includes("embed") || lower.includes("nomic")) {
+    tags.push("embedding");
+  }
+  if (lower.includes("phi") || lower.includes("gemma") || lower.includes("llama3") || lower.includes("mistral")) {
+    tags.push("fast");
+  }
+  if (tags.length === 0) {
+    tags.push("general");
+  }
+  return tags;
+}
+
+function inferContextWindow(modelName: string, paramSize: string): number {
+  const lower = modelName.toLowerCase();
+  if (lower.includes("qwen") || lower.includes("deepseek")) return 32768;
+  if (lower.includes("llama3")) return 131072;
+  if (lower.includes("mistral")) return 32768;
+  if (lower.includes("gemma")) return 8192;
+  if (lower.includes("phi")) return 16384;
+
+  const sizeNum = parseFloat(paramSize);
+  if (sizeNum >= 30) return 32768;
+  if (sizeNum >= 7) return 8192;
+  return 4096;
+}
+
+function modelLabel(name: string): string {
+  const base = name.split(":")[0];
+  return base
+    .split(/[-_]/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+// ── API Functions ───────────────────────────────────────────────────────────
+
+/** Fetch installed models from Ollama */
+export async function fetchOllamaModels(): Promise<ModelProfile[]> {
+  const response = await fetch(`${ollamaHost()}/api/tags`, {
+    method: "GET",
+    signal: AbortSignal.timeout(5000),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Ollama returned HTTP ${response.status}: ${await response.text()}`);
+  }
+
+  const data = (await response.json()) as OllamaTagsResponse;
+
+  return (data.models ?? []).map((model) => ({
+    id: model.name,
+    label: modelLabel(model.name),
+    provider: "ollama" as const,
+    baseUrl: ollamaHost(),
+    contextWindow: inferContextWindow(model.name, model.details.parameter_size),
+    parameterSize: model.details.parameter_size,
+    family: model.details.family,
+    quantization: model.details.quantization_level,
+    sizeBytes: model.size,
+    tags: inferTags(model.name),
+  }));
+}
+
+/** Check if Ollama is reachable */
+export async function checkOllamaHealth(): Promise<{
+  ok: boolean;
+  models: string[];
+  missing: string[];
+  error?: string;
+}> {
+  const requiredModels = [env.OLLAMA_MODEL, env.OLLAMA_REASONING_MODEL, env.OLLAMA_EMBED_MODEL].filter(Boolean);
+
+  try {
+    const models = await fetchOllamaModels();
+    const installedNames = new Set(models.map((m) => m.id.split(":")[0]));
+
+    const missing = requiredModels.filter((name) => {
+      const base = name.split(":")[0];
+      return !installedNames.has(base) && !installedNames.has(name);
+    });
+
+    return {
+      ok: missing.length === 0,
+      models: models.map((m) => m.id),
+      missing,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Ollama unreachable";
+    return {
+      ok: false,
+      models: [],
+      missing: requiredModels,
+      error: message,
+    };
+  }
+}
+
+/** Pull a model from Ollama registry */
+export async function pullOllamaModel(modelName: string): Promise<ReadableStream<Uint8Array>> {
+  const response = await fetch(`${ollamaHost()}/api/pull`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: modelName, stream: true }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to pull ${modelName}: HTTP ${response.status}`);
+  }
+
+  return response.body!;
+}
+
+/** Auto-pull missing models if AUTO_PULL_MODEL is enabled */
+export async function autoPullMissingModels(): Promise<string[]> {
+  if (env.AUTO_PULL_MODEL !== "true") return [];
+
+  const health = await checkOllamaHealth();
+  const pulled: string[] = [];
+
+  for (const model of health.missing) {
+    console.log(`[Ollama] Auto-pulling model: ${model}`);
+    try {
+      const stream = await pullOllamaModel(model);
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+
+      while (!done) {
+        const chunk = await reader.read();
+        done = chunk.done;
+        if (chunk.value) {
+          const text = decoder.decode(chunk.value, { stream: true });
+          for (const line of text.split("\n").filter(Boolean)) {
+            try {
+              const progress = JSON.parse(line) as { status?: string };
+              if (progress.status) {
+                process.stdout.write(`\r[Ollama] ${model}: ${progress.status}    `);
+              }
+            } catch {
+              // skip malformed lines
+            }
+          }
+        }
+      }
+      console.log(`\n[Ollama] Pulled ${model} successfully`);
+      pulled.push(model);
+    } catch (error) {
+      console.error(`[Ollama] Failed to pull ${model}:`, error instanceof Error ? error.message : error);
+    }
+  }
+
+  return pulled;
+}

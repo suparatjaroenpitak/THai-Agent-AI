@@ -1,37 +1,41 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Bot, CheckCircle2, Circle, Loader2, Send, Sparkles, Wrench, XCircle } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Bot, CheckCircle2, Circle, Loader2, RotateCcw, Send, Square, Sparkles, StepForward, Wrench, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { agentWorkflow, toolGroups } from "@/components/opencodex/data";
-import type { ModelConfig } from "@/components/opencodex/types";
+import type { ModelConfig, StreamEvent } from "@/components/opencodex/types";
 
 type ChatMessage = {
-  role: "user" | "assistant" | "tool";
+  role: "user" | "assistant" | "tool" | "thinking";
   content: string;
+  model?: string;
+  duration?: number;
+  tokenCount?: number;
 };
 
 export type WorkflowStep = {
   role: string;
   status: "done" | "active" | "queued" | "failed";
   content: string;
+  duration?: number;
 };
 
 const initialMessages: ChatMessage[] = [
   {
     role: "assistant",
-    content: "Ready. Select a workspace, configure a model, then ask the agent to inspect or change the project."
-  }
+    content: "Ready. Select a workspace, configure an Ollama model, then ask the agent to inspect or change the project.",
+  },
 ];
 
 export function AgentChat({
   workspaceId,
   activePath,
   modelConfig,
-  onWorkflowSteps
+  onWorkflowSteps,
 }: {
   workspaceId: string;
   activePath?: string;
@@ -41,15 +45,149 @@ export function AgentChat({
   const [messages, setMessages] = useState(initialMessages);
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const lastPromptRef = useRef("");
 
   const activeAgent = useMemo(() => agentWorkflow.find((agent) => agent.status === "active"), []);
 
-  async function submitPrompt() {
-    if (!prompt.trim() || busy) return;
-    const userPrompt = prompt.trim();
-    setPrompt("");
+  const addMessage = useCallback((msg: ChatMessage) => {
+    setMessages((current) => [...current, msg]);
+  }, []);
+
+  const updateLastAssistant = useCallback((content: string) => {
+    setMessages((current) => {
+      const updated = [...current];
+      for (let i = updated.length - 1; i >= 0; i--) {
+        if (updated[i].role === "assistant") {
+          updated[i] = { ...updated[i], content };
+          break;
+        }
+      }
+      return updated;
+    });
+  }, []);
+
+  async function submitStreamingChat(userPrompt: string) {
+    if (!userPrompt.trim() || busy) return;
     setBusy(true);
-    setMessages((current) => [...current, { role: "user", content: userPrompt }]);
+    setStreaming(true);
+    lastPromptRef.current = userPrompt;
+
+    addMessage({ role: "user", content: userPrompt });
+    addMessage({ role: "assistant", content: "" });
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const response = await fetch("/api/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "system",
+              content: `You are a senior AI coding agent. You help users inspect, edit, test, and deploy code. Workspace: ${workspaceId}. Active file: ${activePath ?? "none"}. Be concise and actionable.`,
+            },
+            { role: "user", content: userPrompt },
+          ],
+          model: modelConfig.model,
+          temperature: 0.2,
+          num_ctx: 8192,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        updateLastAssistant(`Error: ${errorText}`);
+        return;
+      }
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6).trim();
+          if (data === "[DONE]") continue;
+
+          try {
+            const event = JSON.parse(data) as StreamEvent;
+
+            if (event.type === "chunk") {
+              accumulated += event.content;
+              updateLastAssistant(accumulated);
+            }
+
+            if (event.type === "tool_call") {
+              addMessage({
+                role: "tool",
+                content: `Tool: ${event.tool}\nArgs: ${JSON.stringify(event.arguments, null, 2)}`,
+              });
+            }
+
+            if (event.type === "done") {
+              setMessages((current) => {
+                const updated = [...current];
+                for (let i = updated.length - 1; i >= 0; i--) {
+                  if (updated[i].role === "assistant") {
+                    updated[i] = {
+                      ...updated[i],
+                      model: event.model,
+                      duration: event.totalDuration ? Math.round(event.totalDuration / 1_000_000) : undefined,
+                      tokenCount: event.completionTokens,
+                    };
+                    break;
+                  }
+                }
+                return updated;
+              });
+            }
+
+            if (event.type === "error") {
+              updateLastAssistant(`Error: ${event.error}`);
+            }
+
+            if (event.type === "aborted") {
+              updateLastAssistant(accumulated || "(Aborted)");
+            }
+          } catch {
+            // skip malformed SSE
+          }
+        }
+      }
+    } catch (error) {
+      if (controller.signal.aborted) {
+        // User cancelled — keep what we have
+      } else {
+        const message = error instanceof Error ? error.message : "Stream failed";
+        updateLastAssistant(`Connection error: ${message}`);
+      }
+    } finally {
+      setBusy(false);
+      setStreaming(false);
+      abortRef.current = null;
+    }
+  }
+
+  async function submitAgentWorkflow(userPrompt: string) {
+    if (!userPrompt.trim() || busy) return;
+    setBusy(true);
+    lastPromptRef.current = userPrompt;
+
+    addMessage({ role: "user", content: userPrompt });
 
     try {
       const response = await fetch("/api/agent", {
@@ -62,32 +200,70 @@ export function AgentChat({
           mode: "coding",
           model: {
             model: modelConfig.model,
-            baseUrl: modelConfig.baseUrl,
-            apiKey: modelConfig.apiKey || undefined
-          }
-        })
+            reasoningModel: modelConfig.reasoningModel,
+            codingModel: modelConfig.codingModel,
+            embedModel: modelConfig.embedModel,
+          },
+        }),
       });
       const data = (await response.json()) as { message?: string; steps?: WorkflowStep[] };
       if (Array.isArray(data.steps)) {
         onWorkflowSteps?.(data.steps);
       }
-      setMessages((current) => [
-        ...current,
-        {
-          role: "assistant",
-          content: data.message ?? "Workflow queued. Agent telemetry is available in the task panel."
-        }
-      ]);
+      addMessage({
+        role: "assistant",
+        content: data.message ?? "Workflow completed.",
+      });
     } catch {
-      setMessages((current) => [
-        ...current,
-        {
-          role: "assistant",
-          content: "Agent request failed. Check the model key, base URL, and selected workspace."
-        }
-      ]);
+      addMessage({
+        role: "assistant",
+        content: "Agent request failed. Check that Ollama is running and the model is installed.",
+      });
     } finally {
       setBusy(false);
+    }
+  }
+
+  function handleSubmit() {
+    if (!prompt.trim()) return;
+    const userPrompt = prompt.trim();
+    setPrompt("");
+
+    // Use streaming chat for direct chat, agent workflow for complex tasks
+    if (userPrompt.startsWith("/agent ") || userPrompt.startsWith("/workflow ")) {
+      void submitAgentWorkflow(userPrompt.replace(/^\/(agent|workflow)\s+/, ""));
+    } else {
+      void submitStreamingChat(userPrompt);
+    }
+  }
+
+  function handleAbort() {
+    abortRef.current?.abort();
+  }
+
+  function handleRetry() {
+    if (lastPromptRef.current) {
+      // Remove last assistant + user message pair
+      setMessages((current) => {
+        const trimmed = [...current];
+        while (trimmed.length > 1) {
+          const last = trimmed[trimmed.length - 1];
+          if (last.role === "user" && last.content === lastPromptRef.current) {
+            trimmed.pop();
+            break;
+          }
+          trimmed.pop();
+        }
+        return trimmed;
+      });
+      void submitStreamingChat(lastPromptRef.current);
+    }
+  }
+
+  function handleContinue() {
+    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+    if (lastAssistant?.content) {
+      void submitStreamingChat(`Continue from: ${lastAssistant.content.slice(-200)}`);
     }
   }
 
@@ -108,15 +284,38 @@ export function AgentChat({
           {messages.map((message, index) => (
             <div
               key={`${message.role}-${index}`}
-              className="rounded-md border border-white/10 bg-white/[0.035] p-3 text-xs leading-5 text-zinc-200"
+              className={`rounded-md border p-3 text-xs leading-5 ${
+                message.role === "thinking"
+                  ? "border-amber-400/20 bg-amber-400/5 text-amber-200"
+                  : "border-white/10 bg-white/[0.035] text-zinc-200"
+              }`}
             >
               <div className="mb-1 flex items-center gap-2 text-[11px] uppercase text-zinc-500">
-                {message.role === "tool" ? <Wrench className="size-3" /> : <Sparkles className="size-3" />}
+                {message.role === "tool" ? (
+                  <Wrench className="size-3" />
+                ) : (
+                  <Sparkles className="size-3" />
+                )}
                 {message.role}
+                {message.model && (
+                  <span className="ml-auto font-mono text-[10px] text-zinc-600">{message.model}</span>
+                )}
+                {message.duration !== undefined && (
+                  <span className="text-[10px] text-zinc-600">{message.duration}ms</span>
+                )}
+                {message.tokenCount !== undefined && (
+                  <span className="text-[10px] text-zinc-600">{message.tokenCount} tok</span>
+                )}
               </div>
-              {message.content}
+              <div className="whitespace-pre-wrap">{message.content}</div>
             </div>
           ))}
+          {streaming && (
+            <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+              <Loader2 className="size-3 animate-spin" />
+              Streaming from Ollama...
+            </div>
+          )}
         </div>
       </ScrollArea>
 
@@ -136,18 +335,44 @@ export function AgentChat({
         <Textarea
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSubmit();
+            }
+          }}
           className="min-h-20 resize-none border-white/10 bg-black/20 text-xs"
-          placeholder="Ask the agent to inspect, edit, test, or prepare a Git change"
+          placeholder="Chat with Ollama, or /agent <task> for full workflow"
         />
         <div className="mt-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
             {busy ? <Loader2 className="size-3 animate-spin" /> : <Circle className="size-3" />}
-            Auto routing
+            {modelConfig.model}
           </div>
-          <Button size="sm" onClick={submitPrompt} disabled={busy}>
-            {busy ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />}
-            Send
-          </Button>
+          <div className="flex items-center gap-1">
+            {streaming && (
+              <Button variant="chrome" size="sm" onClick={handleAbort}>
+                <Square className="size-3" />
+                Stop
+              </Button>
+            )}
+            {!busy && lastPromptRef.current && (
+              <>
+                <Button variant="chrome" size="sm" onClick={handleRetry}>
+                  <RotateCcw className="size-3" />
+                  Retry
+                </Button>
+                <Button variant="chrome" size="sm" onClick={handleContinue}>
+                  <StepForward className="size-3" />
+                  Continue
+                </Button>
+              </>
+            )}
+            <Button size="sm" onClick={handleSubmit} disabled={busy || !prompt.trim()}>
+              {busy ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />}
+              Send
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -155,12 +380,13 @@ export function AgentChat({
 }
 
 export function WorkflowPanel({ steps = [] }: { steps?: WorkflowStep[] }) {
-  const renderedSteps: Array<{ role: string; status: "done" | "active" | "queued" | "failed"; detail: string }> =
+  const renderedSteps: Array<{ role: string; status: "done" | "active" | "queued" | "failed"; detail: string; duration?: number }> =
     steps.length > 0
       ? steps.map((step) => ({
           role: step.role,
           status: step.status,
-          detail: step.content
+          detail: step.content,
+          duration: step.duration,
         }))
       : agentWorkflow;
 
@@ -168,7 +394,7 @@ export function WorkflowPanel({ steps = [] }: { steps?: WorkflowStep[] }) {
     <div className="h-full overflow-auto bg-[#181a1c] p-3 scrollbar-thin">
       <div className="mb-3 flex items-center justify-between">
         <span className="text-xs font-semibold text-zinc-200">Workflow</span>
-        <Badge variant="info">LangGraph</Badge>
+        <Badge variant="info">LangGraph + Ollama</Badge>
       </div>
       <div className="space-y-2">
         {renderedSteps.map((agent) => (
@@ -184,8 +410,13 @@ export function WorkflowPanel({ steps = [] }: { steps?: WorkflowStep[] }) {
                 <Circle className="size-4 text-zinc-600" />
               )}
             </div>
-            <div className="min-w-0">
-              <div className="truncate text-xs font-medium text-zinc-200">{agent.role}</div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between">
+                <div className="truncate text-xs font-medium text-zinc-200">{agent.role}</div>
+                {agent.duration !== undefined && (
+                  <span className="text-[10px] text-zinc-600">{agent.duration}ms</span>
+                )}
+              </div>
               <div className="truncate text-[11px] text-zinc-500">{agent.detail}</div>
             </div>
           </div>

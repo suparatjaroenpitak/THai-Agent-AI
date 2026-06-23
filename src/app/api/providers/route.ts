@@ -1,19 +1,29 @@
 import { NextResponse } from "next/server";
-import { modelCatalog } from "@/ai/providers";
+import { fetchOllamaModels } from "@/ai/providers";
 import { routeModel } from "@/ai/router";
+import { env } from "@/env";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const decision = routeModel({
-    mode: "auto",
-    inputTokens: 8000,
-    outputTokens: 2500,
-    requiredTags: ["coding"]
-  });
+  let models;
+  try {
+    models = await fetchOllamaModels();
+  } catch {
+    models = [];
+  }
+
+  const routing = routeModel({ mode: "auto" });
 
   return NextResponse.json({
-    providers: modelCatalog,
-    routing: decision
+    provider: "ollama",
+    host: env.OLLAMA_HOST,
+    models,
+    routing,
+    config: {
+      defaultModel: env.OLLAMA_MODEL,
+      reasoningModel: env.OLLAMA_REASONING_MODEL,
+      embedModel: env.OLLAMA_EMBED_MODEL,
+    },
   });
 }
