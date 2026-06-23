@@ -49,5 +49,27 @@
     "status": "cloning",
     "createdAt": "2026-06-23T15:05:34.027Z",
     "updatedAt": "2026-06-23T15:05:34.027Z"
+  },
+  {
+    "id": "github-08379094f1-8441f294",
+    "name": "vscode-extension-samples",
+    "kind": "github",
+    "rootPath": "D:\\แอพใช้งาน\\ai agent\\THai-Agent-AI\\.agents\\workspaces\\vscode-extension-samples.git-8970b53aac",
+    "repository": "https://github.com/microsoft/vscode-extension-samples.git",
+    "branch": "main",
+    "status": "ready",
+    "createdAt": "2026-06-23T15:08:50.669Z",
+    "updatedAt": "2026-06-23T15:10:02.624Z"
+  },
+  {
+    "id": "github-1fd88d6455-46b7c00d",
+    "name": "automation",
+    "kind": "github",
+    "rootPath": "D:\\แอพใช้งาน\\ai agent\\THai-Agent-AI\\.agents\\workspaces\\automation.git-6d89d2be90",
+    "repository": "https://github.com/suparatjaroenpitak/automation.git",
+    "branch": "main",
+    "status": "cloning",
+    "createdAt": "2026-06-23T15:10:03.653Z",
+    "updatedAt": "2026-06-23T15:10:03.653Z"
   }
 ]

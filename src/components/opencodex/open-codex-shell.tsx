@@ -397,7 +397,10 @@ export function OpenCodexShell() {
     const repository = await requestPrompt("GitHub repository URL or owner/repo:");
     if (!repository?.trim()) return;
 
-      setActiveRail("Source Control");
+    setActiveRail("Sandbox");
+    setWorkspaceTab("terminal");
+    appendTerminalOutput("git clone", `Cloning ${repository.trim()}`);
+
     const response = await fetch("/api/workspaces", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -414,6 +417,7 @@ export function OpenCodexShell() {
 
     const data = (await response.json()) as { workspace: WorkspaceRecord };
     await loadWorkspaces(data.workspace.id);
+    setActiveRail("Explorer");
     appendTerminalOutput("git clone", `Ready at ${data.workspace.rootPath}`);
   }
 
