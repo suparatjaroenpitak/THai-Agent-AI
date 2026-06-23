@@ -525,19 +525,43 @@ export function OpenCodexShell() {
               );
             })}
           </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => setTheme(isDarkTheme ? "light" : "dark")}
-                disabled={!themeReady}
-                className="flex size-9 items-center justify-center rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200"
-              >
-                {isDarkTheme ? <Sun className="size-4" /> : <Moon className="size-4" />}
-                <span className="sr-only">Theme</span>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Theme</TooltipContent>
-          </Tooltip>
+          <div className="flex flex-col gap-1 pb-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className="flex size-9 items-center justify-center rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200"
+                >
+                  <UserCircle className="size-5" />
+                  <span className="sr-only">Accounts</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Accounts</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className="flex size-9 items-center justify-center rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200"
+                >
+                  <Settings className="size-5" />
+                  <span className="sr-only">Manage</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Manage</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setTheme(isDarkTheme ? "light" : "dark")}
+                  disabled={!themeReady}
+                  className="flex size-9 items-center justify-center rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200"
+                >
+                  {isDarkTheme ? <Sun className="size-5" /> : <Moon className="size-5" />}
+                  <span className="sr-only">Theme</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Theme</TooltipContent>
+            </Tooltip>
+          </div>
         </aside>
 
         <section className="flex min-w-0 flex-1 flex-col">
