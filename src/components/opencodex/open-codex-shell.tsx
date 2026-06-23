@@ -397,10 +397,7 @@ export function OpenCodexShell() {
     const repository = await requestPrompt("GitHub repository URL or owner/repo:");
     if (!repository?.trim()) return;
 
-    setActiveRail("GitHub");
-    setWorkspaceTab("terminal");
-    appendTerminalOutput("git clone", `Cloning ${repository.trim()}`);
-
+      setActiveRail("Source Control");
     const response = await fetch("/api/workspaces", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -460,7 +457,7 @@ export function OpenCodexShell() {
   }
 
   async function refreshGitStatus() {
-    setActiveRail("GitHub");
+    setActiveRail("Source Control");
     setWorkspaceTab("diff");
 
     try {
