@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, File, Folder, FolderOpen } from "lucide-react";
+import { ChevronDown, ChevronRight, File, Folder, FolderOpen, Plus, FolderPlus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { WorkspaceTreeNode } from "@/components/opencodex/types";
 
@@ -11,6 +11,9 @@ type FileTreeProps = {
   loading?: boolean;
   onSelectFile: (path: string) => void;
   onToggleFolder: (path: string) => void;
+  onCreateFile?: (parentPath: string) => void;
+  onCreateFolder?: (parentPath: string) => void;
+  onDeleteNode?: (path: string) => void;
 };
 
 function NodeRow({
@@ -19,7 +22,10 @@ function NodeRow({
   expandedFolders,
   selectedPath,
   onSelectFile,
-  onToggleFolder
+  onToggleFolder,
+  onCreateFile,
+  onCreateFolder,
+  onDeleteNode
 }: {
   node: WorkspaceTreeNode;
   depth?: number;
@@ -31,37 +37,68 @@ function NodeRow({
 
   return (
     <div>
-      <button
-        onClick={() => {
-          if (isFolder) {
-            onToggleFolder(node.path);
-            return;
-          }
-
-          onSelectFile(node.path);
-        }}
-        className={`flex h-7 w-full min-w-0 items-center gap-1.5 rounded-sm px-2 text-left text-xs transition-colors ${
+      <div 
+        className={`group flex h-7 w-full min-w-0 items-center gap-1.5 rounded-sm px-2 text-left text-xs transition-colors ${
           isSelected ? "bg-emerald-400/10 text-emerald-200" : "text-zinc-300 hover:bg-white/[0.06]"
         }`}
         style={{ paddingLeft: `${8 + depth * 14}px` }}
       >
-        {isFolder ? (
-          isOpen ? <ChevronDown className="size-3 text-zinc-500" /> : <ChevronRight className="size-3 text-zinc-500" />
-        ) : (
-          <span className="w-3" />
-        )}
-        {isFolder ? (
-          <FolderIcon className="size-3.5 shrink-0 text-amber-300" />
-        ) : (
-          <File className="size-3.5 shrink-0 text-sky-300" />
-        )}
-        <span className="truncate">{node.name}</span>
-        {node.path.endsWith("route.ts") ? (
-          <Badge variant="info" className="ml-auto h-5 px-1.5 py-0 text-[10px]">
-            API
-          </Badge>
-        ) : null}
-      </button>
+        <button
+          onClick={() => {
+            if (isFolder) {
+              onToggleFolder(node.path);
+              return;
+            }
+            onSelectFile(node.path);
+          }}
+          className="flex flex-1 items-center gap-1.5 min-w-0"
+        >
+          {isFolder ? (
+            isOpen ? <ChevronDown className="size-3 text-zinc-500 shrink-0" /> : <ChevronRight className="size-3 text-zinc-500 shrink-0" />
+          ) : (
+            <span className="w-3 shrink-0" />
+          )}
+          {isFolder ? (
+            <FolderIcon className="size-3.5 shrink-0 text-amber-300" />
+          ) : (
+            <File className="size-3.5 shrink-0 text-sky-300" />
+          )}
+          <span className="truncate">{node.name}</span>
+          {node.path.endsWith("route.ts") ? (
+            <Badge variant="info" className="ml-2 h-5 px-1.5 py-0 text-[10px] shrink-0">
+              API
+            </Badge>
+          ) : null}
+        </button>
+
+        <div className="hidden items-center group-hover:flex bg-[#252526] pl-1 rounded-sm">
+          {isFolder && (
+            <>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onCreateFile?.(node.path); }}
+                className="p-1 hover:bg-white/10 rounded-sm text-zinc-400 hover:text-zinc-100"
+                title="New File"
+              >
+                <Plus className="size-3" />
+              </button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onCreateFolder?.(node.path); }}
+                className="p-1 hover:bg-white/10 rounded-sm text-zinc-400 hover:text-zinc-100"
+                title="New Folder"
+              >
+                <FolderPlus className="size-3" />
+              </button>
+            </>
+          )}
+          <button 
+            onClick={(e) => { e.stopPropagation(); onDeleteNode?.(node.path); }}
+            className="p-1 hover:bg-white/10 rounded-sm text-zinc-400 hover:text-red-400"
+            title="Delete"
+          >
+            <Trash2 className="size-3" />
+          </button>
+        </div>
+      </div>
       {isFolder && isOpen && node.children
         ? node.children.map((child) => (
             <NodeRow
@@ -72,6 +109,9 @@ function NodeRow({
               selectedPath={selectedPath}
               onSelectFile={onSelectFile}
               onToggleFolder={onToggleFolder}
+              onCreateFile={onCreateFile}
+              onCreateFolder={onCreateFolder}
+              onDeleteNode={onDeleteNode}
             />
           ))
         : null}
@@ -79,7 +119,7 @@ function NodeRow({
   );
 }
 
-export function FileTree({ tree, expandedFolders, selectedPath, loading, onSelectFile, onToggleFolder }: FileTreeProps) {
+export function FileTree({ tree, expandedFolders, selectedPath, loading, onSelectFile, onToggleFolder, onCreateFile, onCreateFolder, onDeleteNode }: FileTreeProps) {
   return (
     <div className="h-full overflow-auto px-1 py-2 scrollbar-thin">
       {loading ? <div className="px-2 py-3 text-xs text-zinc-500">Loading workspace</div> : null}
@@ -92,6 +132,9 @@ export function FileTree({ tree, expandedFolders, selectedPath, loading, onSelec
           selectedPath={selectedPath}
           onSelectFile={onSelectFile}
           onToggleFolder={onToggleFolder}
+          onCreateFile={onCreateFile}
+          onCreateFolder={onCreateFolder}
+          onDeleteNode={onDeleteNode}
         />
       ))}
     </div>

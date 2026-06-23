@@ -18,8 +18,13 @@ import {
   Sun,
   Terminal,
   UploadCloud,
+<<<<<<< Updated upstream
   X,
   UserCircle
+=======
+  UserCircle,
+  X
+>>>>>>> Stashed changes
 } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useTheme } from "next-themes";
@@ -271,6 +276,63 @@ export function OpenCodexShell() {
       ...current,
       [path]: !(current[path] ?? true)
     }));
+  }
+
+  function closeFileTab(path: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    const nextTabs = openFileTabs.filter((tab) => tab !== path);
+    setOpenFileTabs(nextTabs);
+    
+    if (activeFile === path) {
+      const nextActive = nextTabs[nextTabs.length - 1];
+      if (nextActive) {
+        void openFile(nextActive);
+      } else {
+        setActiveFile("");
+        setEditorFile(emptyEditorFile);
+      }
+    }
+  }
+
+  async function handleCreateFile(parentPath: string) {
+    const name = await requestPrompt(`New file name in ${parentPath}:`);
+    if (!name?.trim()) return;
+    const newPath = `${parentPath}/${name.trim()}`;
+    const response = await fetch("/api/workspaces/files", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId: activeWorkspaceId, path: newPath, content: "" })
+    });
+    if (response.ok) {
+      await loadWorkspaceTree(activeWorkspaceId);
+      void openFile(newPath);
+    }
+  }
+
+  async function handleCreateFolder(parentPath: string) {
+    const name = await requestPrompt(`New folder name in ${parentPath}:`);
+    if (!name?.trim()) return;
+    const newPath = `${parentPath}/${name.trim()}`;
+    // Use Terminal tool internally since Node/Bun can handle generic shell commands if wrapped correctly
+    // or just run mkdir (Windows/Linux compat via bun)
+    await runTerminalCommand(`bun run -e "import { mkdir } from 'node:fs/promises'; await mkdir('${newPath}', { recursive: true })"`);
+    await loadWorkspaceTree(activeWorkspaceId);
+  }
+
+  async function handleDeleteNode(path: string) {
+    if (!confirm(`Are you sure you want to delete ${path}?`)) return;
+    await runTerminalCommand(`bun run -e "import { rm } from 'node:fs/promises'; await rm('${path}', { recursive: true, force: true })"`);
+    
+    const nextTabs = openFileTabs.filter((tab) => !tab.startsWith(path));
+    if (nextTabs.length !== openFileTabs.length) {
+      setOpenFileTabs(nextTabs);
+      if (activeFile.startsWith(path)) {
+        setActiveFile("");
+        setEditorFile(emptyEditorFile);
+      }
+    }
+    
+    await loadWorkspaceTree(activeWorkspaceId);
   }
 
   function resetWorkbench() {
@@ -543,6 +605,7 @@ export function OpenCodexShell() {
               );
             })}
           </div>
+<<<<<<< Updated upstream
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -556,6 +619,45 @@ export function OpenCodexShell() {
             </TooltipTrigger>
             <TooltipContent side="right">Theme</TooltipContent>
           </Tooltip>
+=======
+          <div className="flex flex-col gap-2 pb-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className="flex size-12 items-center justify-center rounded-md text-zinc-500 hover:text-white"
+                >
+                  <UserCircle className="size-6 stroke-[1.5]" />
+                  <span className="sr-only">Accounts</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Accounts</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className="flex size-12 items-center justify-center rounded-md text-zinc-500 hover:text-white"
+                >
+                  <Settings className="size-6 stroke-[1.5]" />
+                  <span className="sr-only">Manage</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Manage</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setTheme(isDarkTheme ? "light" : "dark")}
+                  disabled={!themeReady}
+                  className="flex size-12 items-center justify-center rounded-md text-zinc-500 hover:text-white"
+                >
+                  {isDarkTheme ? <Sun className="size-6 stroke-[1.5]" /> : <Moon className="size-6 stroke-[1.5]" />}
+                  <span className="sr-only">Theme</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Theme</TooltipContent>
+            </Tooltip>
+          </div>
+>>>>>>> Stashed changes
         </aside>
 
         <section className="flex min-w-0 flex-1 flex-col">
@@ -595,9 +697,9 @@ export function OpenCodexShell() {
           </header>
 
           <PanelGroup direction="horizontal" className="min-h-0 flex-1">
-            <Panel defaultSize={18} minSize={14} maxSize={28} className="min-w-[220px] border-r border-white/10 bg-[#16181a]">
-              <div className="flex h-9 items-center justify-between border-b border-white/10 px-3">
-                <span className="truncate text-xs font-semibold uppercase text-zinc-400">Explorer</span>
+            <Panel defaultSize={20} minSize={15} maxSize={30} className="min-w-[200px] border-r border-white/10 bg-[#252526]">
+              <div className="flex h-[35px] items-center justify-between border-b border-white/10 px-4">
+                <span className="truncate text-[11px] font-normal uppercase text-zinc-300 tracking-wider">Explorer</span>
                 <button onClick={() => void loadWorkspaceTree(activeWorkspaceId)} className="text-zinc-500 hover:text-zinc-200">
                   <RefreshCw className="size-3.5" />
                   <span className="sr-only">Refresh</span>
@@ -624,6 +726,9 @@ export function OpenCodexShell() {
                 selectedPath={activeFile}
                 onSelectFile={(path) => void openFile(path)}
                 onToggleFolder={toggleFolder}
+                onCreateFile={handleCreateFile}
+                onCreateFolder={handleCreateFolder}
+                onDeleteNode={handleDeleteNode}
               />
             </Panel>
 
@@ -633,30 +738,45 @@ export function OpenCodexShell() {
               <PanelGroup direction="vertical" className="min-h-0">
                 <Panel defaultSize={68} minSize={42}>
                   <section className="flex h-full min-h-0 flex-col bg-[#121212]">
-                    <div className="flex h-9 shrink-0 items-center border-b border-white/10 bg-[#1b1d1f]">
+                    <div className="flex h-[35px] shrink-0 items-center overflow-x-auto border-b border-[#252526] bg-[#252526] scrollbar-none">
                       {openFileTabs.map((tab) => (
-                        <button
+                        <div
                           key={tab}
                           onClick={() => void openFile(tab)}
-                          className={`flex h-full min-w-0 max-w-[260px] items-center gap-2 border-r border-white/10 px-3 text-xs ${
-                            tab === activeFile ? "bg-[#121212] text-zinc-100" : "text-zinc-500 hover:text-zinc-200"
+                          className={`group flex h-full min-w-[120px] max-w-[200px] cursor-pointer items-center justify-between gap-2 border-r border-[#1e1e1e] px-3 text-[13px] ${
+                            tab === activeFile ? "bg-[#1e1e1e] text-[#cccccc] border-t border-t-[#007acc]" : "bg-[#2d2d2d] text-[#969696] hover:bg-[#2b2b2b]"
                           }`}
                         >
-                          <span className="truncate">
-                            {dirtyFiles[tab] ? "* " : ""}
-                            {tab}
-                          </span>
-                        </button>
+                          <div className="flex items-center gap-1.5 truncate">
+                            {dirtyFiles[tab] && tab !== activeFile && <div className="size-2 rounded-full bg-white text-transparent">o</div>}
+                            <span className="truncate">
+                              {tab.split("/").pop()}
+                            </span>
+                          </div>
+                          <button
+                            onClick={(e) => closeFileTab(tab, e)}
+                            className={`flex size-5 items-center justify-center rounded-md hover:bg-white/10 ${
+                              tab === activeFile || dirtyFiles[tab] ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                            }`}
+                          >
+                             {dirtyFiles[tab] ? (
+                                <div className="size-2 rounded-full bg-white" />
+                             ) : (
+                                <X className="size-3.5" />
+                             )}
+                          </button>
+                        </div>
                       ))}
+                      <div className="flex-1 bg-[#252526] h-full" />
                       <button
                         onClick={() => setWorkspaceTab((current) => (current === "diff" ? "terminal" : "diff"))}
-                        className="ml-auto flex h-full w-10 items-center justify-center text-zinc-500 hover:text-zinc-200"
+                        className="ml-auto flex h-full w-10 shrink-0 items-center justify-center bg-[#252526] text-zinc-500 hover:text-zinc-200"
                       >
                         <SplitSquareHorizontal className="size-4" />
                         <span className="sr-only">Split</span>
                       </button>
                     </div>
-                    <div className="min-h-0 flex-1">
+                    <div className="min-h-0 flex-1 bg-[#1e1e1e]">
                       <CodeEditor
                         path={editorFile.path || "workspace"}
                         language={editorFile.language}

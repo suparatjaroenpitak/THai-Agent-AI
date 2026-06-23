@@ -36,6 +36,7 @@ export function ProviderRouting({
   const [ollamaStatus, setOllamaStatus] = useState<"loading" | "connected" | "error">("loading");
   const [pullModel, setPullModel] = useState("");
   const [pulling, setPulling] = useState(false);
+  const [pullProgress, setPullProgress] = useState<{ status: string; percentage: number } | null>(null);
 
   useEffect(() => {
     loadModels();
@@ -72,18 +73,39 @@ export function ProviderRouting({
       const reader = response.body?.getReader();
       if (reader) {
         const decoder = new TextDecoder();
+        let buffer = "";
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          decoder.decode(value, { stream: true });
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            if (line.startsWith("data: ") && line !== "data: [DONE]") {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.status) {
+                  let percentage = 0;
+                  if (data.total && data.completed) {
+                    percentage = Math.round((data.completed / data.total) * 100);
+                  }
+                  setPullProgress({ status: data.status, percentage });
+                }
+              } catch {
+                // ignore parse error
+              }
+            }
+          }
         }
         reader.releaseLock();
       }
 
       setPullModel("");
+      setPullProgress(null);
       await loadModels();
     } catch {
       // error handled silently
+      setPullProgress({ status: "Error pulling model", percentage: 0 });
     } finally {
       setPulling(false);
     }
@@ -188,18 +210,36 @@ export function ProviderRouting({
       {/* Pull model */}
       <div className="border-b border-white/10 p-3">
         <label className="mb-1.5 block text-[11px] uppercase text-zinc-500">Pull New Model</label>
-        <div className="flex gap-2">
-          <Input
-            value={pullModel}
-            onChange={(e) => setPullModel(e.target.value)}
-            className="h-8 flex-1 border-white/10 bg-black/20 text-xs"
-            placeholder="e.g. llama3.2, phi4, gemma3"
-            onKeyDown={(e) => { if (e.key === "Enter") handlePull(); }}
-          />
-          <Button size="sm" onClick={handlePull} disabled={pulling || !pullModel.trim()}>
-            {pulling ? <Loader2 className="size-3 animate-spin" /> : <Download className="size-3" />}
-            Pull
-          </Button>
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <Input
+              value={pullModel}
+              onChange={(e) => setPullModel(e.target.value)}
+              className="h-8 flex-1 border-white/10 bg-black/20 text-xs"
+              placeholder="e.g. llama3.2, phi4, gemma3"
+              onKeyDown={(e) => { if (e.key === "Enter") handlePull(); }}
+            />
+            <Button size="sm" onClick={handlePull} disabled={pulling || !pullModel.trim()}>
+              {pulling ? <Loader2 className="size-3 animate-spin" /> : <Download className="size-3" />}
+              Pull
+            </Button>
+          </div>
+          {pullProgress && (
+            <div className="flex flex-col gap-1.5 pt-1">
+              <div className="flex justify-between text-[10px] text-zinc-400">
+                <span className="truncate">{pullProgress.status}</span>
+                {pullProgress.percentage > 0 && <span>{pullProgress.percentage}%</span>}
+              </div>
+              {pullProgress.percentage > 0 && (
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/40">
+                  <div 
+                    className="h-full bg-emerald-500 transition-all duration-300" 
+                    style={{ width: `${pullProgress.percentage}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

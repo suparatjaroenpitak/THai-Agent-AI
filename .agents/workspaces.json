@@ -20,6 +20,7 @@
     "updatedAt": "2026-06-22T23:10:22.363Z"
   },
   {
+<<<<<<< Updated upstream
     "id": "local-8ccb022f96",
     "name": "Free YouTube Transcript Generator",
     "kind": "local",
@@ -36,5 +37,49 @@
     "status": "ready",
     "createdAt": "2026-06-23T11:39:14.190Z",
     "updatedAt": "2026-06-23T11:39:14.190Z"
+=======
+    "id": "github-1cf7b509bc-63d05e76",
+    "name": "vide-gen-ai-Unknow-TV",
+    "kind": "github",
+    "rootPath": "D:\\แอพใช้งาน\\ai agent\\THai-Agent-AI\\.agents\\workspaces\\vide-gen-ai-Unknow-TV.git-f8800204d1",
+    "repository": "https://github.com/suparatjaroenpitak/vide-gen-ai-Unknow-TV.git",
+    "branch": "main",
+    "status": "cloning",
+    "createdAt": "2026-06-23T12:59:18.703Z",
+    "updatedAt": "2026-06-23T12:59:18.703Z"
+  },
+  {
+    "id": "github-1cf7b509bc-f116b932",
+    "name": "vide-gen-ai-Unknow-TV",
+    "kind": "github",
+    "rootPath": "D:\\แอพใช้งาน\\ai agent\\THai-Agent-AI\\.agents\\workspaces\\vide-gen-ai-Unknow-TV.git-63aec84b0e",
+    "repository": "https://github.com/suparatjaroenpitak/vide-gen-ai-Unknow-TV.git",
+    "branch": "main",
+    "status": "cloning",
+    "createdAt": "2026-06-23T12:59:26.248Z",
+    "updatedAt": "2026-06-23T12:59:26.248Z"
+  },
+  {
+    "id": "github-1cf7b509bc-f39af14d",
+    "name": "vide-gen-ai-Unknow-TV",
+    "kind": "github",
+    "rootPath": "D:\\แอพใช้งาน\\ai agent\\THai-Agent-AI\\.agents\\workspaces\\vide-gen-ai-Unknow-TV.git-847403ee61",
+    "repository": "https://github.com/suparatjaroenpitak/vide-gen-ai-Unknow-TV.git",
+    "branch": "main",
+    "status": "cloning",
+    "createdAt": "2026-06-23T12:59:39.328Z",
+    "updatedAt": "2026-06-23T12:59:39.328Z"
+  },
+  {
+    "id": "github-1cf7b509bc-3518e168",
+    "name": "vide-gen-ai-Unknow-TV",
+    "kind": "github",
+    "rootPath": "D:\\แอพใช้งาน\\ai agent\\THai-Agent-AI\\.agents\\workspaces\\vide-gen-ai-Unknow-TV.git-ab8f15ab0b",
+    "repository": "https://github.com/suparatjaroenpitak/vide-gen-ai-Unknow-TV.git",
+    "branch": "main",
+    "status": "cloning",
+    "createdAt": "2026-06-23T13:00:17.834Z",
+    "updatedAt": "2026-06-23T13:00:17.834Z"
+>>>>>>> Stashed changes
   }
 ]
