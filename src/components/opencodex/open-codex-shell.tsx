@@ -287,26 +287,33 @@ export function OpenCodexShell() {
   }
 
   async function bindLocalFolder() {
-    const localPath = await requestPrompt("Project folder path:");
-    if (!localPath?.trim()) return;
+    try {
+      const browseRes = await fetch("/api/system/browse");
+      if (!browseRes.ok) throw new Error(await browseRes.text());
+      const { path: localPath } = (await browseRes.json()) as { path: string };
 
-    const response = await fetch("/api/workspaces", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        kind: "local",
-        path: localPath.trim()
-      })
-    });
+      if (!localPath?.trim()) return;
 
-    if (!response.ok) {
-      appendTerminalOutput("workspace local", await response.text());
-      return;
+      const response = await fetch("/api/workspaces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "local",
+          path: localPath.trim()
+        })
+      });
+
+      if (!response.ok) {
+        appendTerminalOutput("workspace local", await response.text());
+        return;
+      }
+
+      const data = (await response.json()) as { workspace: WorkspaceRecord };
+      await loadWorkspaces(data.workspace.id);
+      appendTerminalOutput("workspace local", `Bound ${data.workspace.rootPath}`);
+    } catch (err: any) {
+      appendTerminalOutput("workspace local", `Failed to browse folder: ${err.message}`);
     }
-
-    const data = (await response.json()) as { workspace: WorkspaceRecord };
-    await loadWorkspaces(data.workspace.id);
-    appendTerminalOutput("workspace local", `Bound ${data.workspace.rootPath}`);
   }
 
   async function cloneGithubRepository() {
