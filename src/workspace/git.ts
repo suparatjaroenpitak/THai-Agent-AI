@@ -30,16 +30,28 @@ export async function runGit(args: string[], workspaceId = "current-workspace", 
   }
 
   const workingDirectory = await resolveWorkspacePath(workspaceId, cwd);
-  const { stdout, stderr } = await execFileAsync("git", args, {
-    cwd: workingDirectory,
-    timeout: 60_000,
-    maxBuffer: 1024 * 1024 * 8
-  });
+  
+  try {
+    const { stdout, stderr } = await execFileAsync("git", args, {
+      cwd: workingDirectory,
+      timeout: 60_000,
+      maxBuffer: 1024 * 1024 * 8
+    });
 
-  return {
-    stdout,
-    stderr,
-    cwd: workingDirectory,
-    command: `git ${args.join(" ")}`
-  };
+    return {
+      stdout,
+      stderr,
+      cwd: workingDirectory,
+      command: `git ${args.join(" ")}`,
+      exitCode: 0
+    };
+  } catch (error: any) {
+    return {
+      stdout: error.stdout || "",
+      stderr: error.stderr || error.message || String(error),
+      cwd: workingDirectory,
+      command: `git ${args.join(" ")}`,
+      exitCode: error.code || 1
+    };
+  }
 }

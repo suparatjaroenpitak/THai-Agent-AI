@@ -71,5 +71,38 @@
     "status": "cloning",
     "createdAt": "2026-06-23T15:10:03.653Z",
     "updatedAt": "2026-06-23T15:10:03.653Z"
+  },
+  {
+    "id": "github-1fd88d6455-867b3d9e",
+    "name": "automation",
+    "kind": "github",
+    "rootPath": "D:\\แอพใช้งาน\\ai agent\\THai-Agent-AI\\.agents\\workspaces\\automation.git-593833aac2",
+    "repository": "https://github.com/suparatjaroenpitak/automation.git",
+    "branch": "main",
+    "status": "cloning",
+    "createdAt": "2026-06-23T15:12:29.467Z",
+    "updatedAt": "2026-06-23T15:12:29.467Z"
+  },
+  {
+    "id": "github-1fd88d6455-3a560524",
+    "name": "automation",
+    "kind": "github",
+    "rootPath": "D:\\แอพใช้งาน\\ai agent\\THai-Agent-AI\\.agents\\workspaces\\automation.git-e230bb35c6",
+    "repository": "https://github.com/suparatjaroenpitak/automation.git",
+    "branch": "main",
+    "status": "cloning",
+    "createdAt": "2026-06-23T15:12:44.294Z",
+    "updatedAt": "2026-06-23T15:12:44.294Z"
+  },
+  {
+    "id": "github-28d5127566-c1ffebc8",
+    "name": "POS2",
+    "kind": "github",
+    "rootPath": "D:\\แอพใช้งาน\\ai agent\\THai-Agent-AI\\.agents\\workspaces\\POS2.git-030efcc4ac",
+    "repository": "https://github.com/suparatjaroenpitak/POS2.git",
+    "branch": "main",
+    "status": "ready",
+    "createdAt": "2026-06-23T15:21:43.300Z",
+    "updatedAt": "2026-06-23T15:21:44.615Z"
   }
 ]

@@ -72,18 +72,14 @@ async function callOllama(
     { role: "user", content: userContent },
   ];
 
-  const result = await runOllamaChat({ messages, model });
-  return {
-    content: result.message.content,
-    duration: Date.now() - start,
-  };
-}
-
-// ── Agents ──────────────────────────────────────────────────────────────────
-
-async function plannerAgent(state: typeof AgentState.State) {
-  const model = resolveModel(state.model, "reasoning");
-  try {
+    // We limit num_ctx to smaller value during multi-agent chaining to prevent
+    // Ollama from crashing with CUDA illegal memory access when contexts get too large.
+    const result = await runOllamaChat({ 
+      messages, 
+      model,
+      options: { num_ctx: 16384, temperature: 0.1 }
+    });
+    
     const result = await callOllama(
       "You are a senior engineering planner. Analyze the user's request and break it down into concrete execution steps. Output a numbered plan. Be concise.",
       `Workspace: ${state.workspaceId}\nActive file: ${state.activePath ?? "none"}\n\nRequest:\n${state.prompt}`,

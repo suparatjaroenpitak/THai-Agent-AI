@@ -437,7 +437,8 @@ export function OpenCodexShell() {
       });
       const data = (await response.json().catch(() => ({}))) as { stdout?: string; stderr?: string };
       const output = [data.stdout, data.stderr].filter(Boolean).join("\n");
-      appendTerminalOutput(command, response.ok ? output : JSON.stringify(data));
+        // APIs that return exit codes now return response.ok = true with exitCode field
+        appendTerminalOutput(command, output || (response.ok ? "<no output>" : JSON.stringify(data)));
     } catch (error) {
       appendTerminalOutput(command, error instanceof Error ? error.message : "Command failed");
     } finally {
