@@ -486,11 +486,6 @@ export function OpenCodexShell() {
       return;
     }
 
-    if (label === "AI Agents") {
-      setInspectorTab("chat");
-      return;
-    }
-
     if (label === "Sandbox") {
       setWorkspaceTab("terminal");
     }
