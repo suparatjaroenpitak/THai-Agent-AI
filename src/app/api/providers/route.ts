@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { fetchOllamaModels } from "@/ai/providers";
+import { fetchOllamaModels, type ModelProfile } from "@/ai/providers";
 import { routeModel } from "@/ai/router";
 import { env } from "@/env";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  let models;
+  let models: ModelProfile[] = [];
   try {
     models = await fetchOllamaModels();
   } catch {

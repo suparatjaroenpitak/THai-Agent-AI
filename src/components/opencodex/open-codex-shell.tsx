@@ -419,7 +419,7 @@ export function OpenCodexShell() {
 
   async function runTerminalCommand(command: string) {
     setTerminalBusy(true);
-    setActiveRail("Terminal");
+    setActiveRail("Sandbox");
     setWorkspaceTab("terminal");
 
     try {
@@ -486,13 +486,12 @@ export function OpenCodexShell() {
       return;
     }
 
-    if (label === "Sandbox") {
-      setInspectorTab("models");
-      setWorkspaceTab("terminal");
+    if (label === "AI Agents") {
+      setInspectorTab("chat");
       return;
     }
 
-    if (label === "Terminal") {
+    if (label === "Sandbox") {
       setWorkspaceTab("terminal");
     }
   }
