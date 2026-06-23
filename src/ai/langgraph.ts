@@ -72,12 +72,10 @@ async function callOllama(
     { role: "user", content: userContent },
   ];
 
-    // We limit num_ctx to smaller value during multi-agent chaining to prevent
-    // Ollama from crashing with CUDA illegal memory access when contexts get too large.
     const result = await runOllamaChat({ 
       messages, 
       model,
-      options: { num_ctx: 16384, temperature: 0.1 }
+      options: { num_ctx: 32768, temperature: 0.1 }
     });
     
     const result = await callOllama(
