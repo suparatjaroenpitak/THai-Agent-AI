@@ -514,7 +514,7 @@ export function OpenCodexShell() {
     }
 
     if (label === "Run planner workflow") {
-      setActiveRail("Agents");
+      setActiveRail("AI Agents");
       setInspectorTab("chat");
       return;
     }
@@ -545,7 +545,7 @@ export function OpenCodexShell() {
     }
 
     if (label === "Configure Ollama models") {
-      setActiveRail("Agents");
+      setActiveRail("AI Agents");
       setInspectorTab("models");
       return;
     }
@@ -556,7 +556,7 @@ export function OpenCodexShell() {
     }
 
     if (label === "Ask Coder agent") {
-      setActiveRail("Agents");
+      setActiveRail("AI Agents");
       setInspectorTab("chat");
     }
   }
