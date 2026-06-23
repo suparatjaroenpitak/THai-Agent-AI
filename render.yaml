@@ -1,0 +1,76 @@
+services:
+  # 1) ฐานข้อมูล PostgreSQL สำหรับเก็บข้อมูลระบบทั้งหมด
+  - type: pserv
+    name: opencodex-db
+    env: image
+    image:
+      url: postgres:16-alpine
+    disk:
+      name: postgres-data
+      mountPath: /var/lib/postgresql/data
+      sizeGB: 1
+    envVars:
+      - key: POSTGRES_DB
+        value: opencodex
+      - key: POSTGRES_USER
+        value: opencodex
+      - key: POSTGRES_PASSWORD
+        generateValue: true
+
+  # 2) ฐานข้อมูล Redis
+  - type: pserv
+    name: opencodex-redis
+    env: image
+    image:
+      url: redis:7-alpine
+    disk:
+      name: redis-data
+      mountPath: /data
+      sizeGB: 1
+
+  # 3) Ollama Service สำหรับรัน AI Model ภายในเครือข่าย
+  - type: pserv
+    name: opencodex-ollama
+    env: image
+    image:
+      url: ollama/ollama:latest
+    disk:
+      name: ollama-data
+      mountPath: /root/.ollama
+      sizeGB: 10
+    plan: standard # ต้องการ RAM ที่เพียงพอสำหรับรัน AI Model
+
+  # 4) บริการ Backend Worker และประมวลผล Agent
+  - type: worker
+    name: opencodex-worker
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: bun run worker
+    envVars:
+      - key: REDIS_URL
+        value: redis://opencodex-redis:6379
+      - key: OLLAMA_HOST
+        value: http://opencodex-ollama:11434
+      - key: OLLAMA_MODEL
+        value: qwen2.5-coder # แนะนำโมเดลขนาดเล็กเวลาใช้อยู่บน Render เช่น qwen2.5:3b
+      - key: DATABASE_URL
+        value: postgres://opencodex:${POSTGRES_PASSWORD}@opencodex-db:5432/opencodex
+      - key: AUTO_PULL_MODEL
+        value: "true"
+
+  # 5) เว็บแอปพลิเคชันหลัก Next.js
+  - type: web
+    name: opencodex-web
+    env: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: REDIS_URL
+        value: redis://opencodex-redis:6379
+      - key: OLLAMA_HOST
+        value: http://opencodex-ollama:11434
+      - key: DATABASE_URL
+        value: postgres://opencodex:${POSTGRES_PASSWORD}@opencodex-db:5432/opencodex
+      - key: AUTO_PULL_MODEL
+        value: "true"
+      - key: BETTER_AUTH_SECRET
+        generateValue: true

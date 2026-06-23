@@ -18,5 +18,14 @@
     "status": "ready",
     "createdAt": "2026-06-23T14:07:00.441Z",
     "updatedAt": "2026-06-23T14:07:00.441Z"
+  },
+  {
+    "id": "local-161e7c163a",
+    "name": "automation",
+    "kind": "local",
+    "rootPath": "D:\\แอพใช้งาน\\automations\\automation",
+    "status": "ready",
+    "createdAt": "2026-06-23T14:28:28.485Z",
+    "updatedAt": "2026-06-23T14:28:28.485Z"
   }
 ]
