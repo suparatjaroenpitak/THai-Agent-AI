@@ -71,7 +71,8 @@ const config = {
       },
       fontFamily: {
         sans: ["var(--font-geist-sans)", "Inter", "system-ui", "sans-serif"],
-        mono: ["var(--font-geist-mono)", "JetBrains Mono", "monospace"]
+        mono: ["var(--font-geist-mono)", "JetBrains Mono", "monospace"],
+        sarabun: ["var(--font-sarabun)", "sans-serif"]
       },
       boxShadow: {
         command: "0 24px 80px rgb(0 0 0 / 0.35)"

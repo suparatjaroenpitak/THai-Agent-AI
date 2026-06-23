@@ -6,6 +6,7 @@
       "dependencies": {
         "@ai-sdk/openai-compatible": "^0.2.16",
         "@better-auth/drizzle-adapter": "^1.2.12",
+        "@fontsource/sarabun": "5.2.8",
         "@langchain/core": "^0.3.57",
         "@langchain/langgraph": "^0.2.69",
         "@monaco-editor/react": "^4.7.0",
@@ -242,6 +243,8 @@
     "@floating-ui/react-dom": ["@floating-ui/react-dom@2.1.8", "", { "dependencies": { "@floating-ui/dom": "^1.7.6" }, "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-cC52bHwM/n/CxS87FH0yWdngEZrjdtLW/qVruo68qg+prK7ZQ4YGdut2GyDVpoGeAYe/h899rVeOVm6Oi40k2A=="],
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.11", "", {}, "sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg=="],
+
+    "@fontsource/sarabun": ["@fontsource/sarabun@5.2.8", "", {}, "sha512-EDf1jYaGmdeOOi3dKqy6Bjb+qPtsrJJyleoqAPq+VgStcJExwhqzYRT9HOeGE73RtfmvgJEdxk1W72EdxL6+ow=="],
 
     "@grpc/grpc-js": ["@grpc/grpc-js@1.14.4", "", { "dependencies": { "@grpc/proto-loader": "^0.8.0", "@js-sdsl/ordered-map": "^4.4.2" } }, "sha512-k9Dj3DV/itK9D06Y8f190Qgop7/Ui+D0njFV3LHMPwPT75DpXLQohE9Wmz0QElrJnzsjB7KPWiKJbOl7IPDArQ=="],
 

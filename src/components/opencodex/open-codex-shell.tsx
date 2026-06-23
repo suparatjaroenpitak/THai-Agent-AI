@@ -18,13 +18,8 @@ import {
   Sun,
   Terminal,
   UploadCloud,
-<<<<<<< Updated upstream
-  X,
-  UserCircle
-=======
   UserCircle,
   X
->>>>>>> Stashed changes
 } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useTheme } from "next-themes";
@@ -605,21 +600,6 @@ export function OpenCodexShell() {
               );
             })}
           </div>
-<<<<<<< Updated upstream
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => setTheme(isDarkTheme ? "light" : "dark")}
-                disabled={!themeReady}
-                className="flex size-9 items-center justify-center rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200"
-              >
-                {isDarkTheme ? <Sun className="size-4" /> : <Moon className="size-4" />}
-                <span className="sr-only">Theme</span>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Theme</TooltipContent>
-          </Tooltip>
-=======
           <div className="flex flex-col gap-2 pb-2">
             <Tooltip>
               <TooltipTrigger asChild>
@@ -657,7 +637,6 @@ export function OpenCodexShell() {
               <TooltipContent side="right">Theme</TooltipContent>
             </Tooltip>
           </div>
->>>>>>> Stashed changes
         </aside>
 
         <section className="flex min-w-0 flex-1 flex-col">
