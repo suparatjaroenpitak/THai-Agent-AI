@@ -314,7 +314,15 @@ export async function saveWorkspaceFile(relativePath: string, content: string, w
 
 export async function collectWorkspaceContext(workspaceId = "current-workspace", activePath?: string) {
   const workspace = await getWorkspace(workspaceId);
-  const candidateFiles = ["README.md", "package.json", "src/app/page.tsx", activePath].filter(Boolean) as string[];
+    const candidateFiles = [
+      "README.md", 
+      "package.json", 
+      "components.json",
+      "tailwind.config.ts", 
+      "tsconfig.json", 
+      "src/app/page.tsx", 
+      activePath
+    ].filter(Boolean) as string[];
   const seen = new Set<string>();
   const files = [];
 
