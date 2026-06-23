@@ -22,6 +22,8 @@ import {
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -115,7 +117,31 @@ export function OpenCodexShell() {
   const [gitOutput, setGitOutput] = useState("Git status will appear here.");
   const [modelConfig, setModelConfig] = useState<ModelConfig>(defaultModelConfig);
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
+  const [promptData, setPromptData] = useState<{ open: boolean; title: string; resolve: (val: string | null) => void } | null>(null);
+  const [promptInputValue, setPromptInputValue] = useState("");
   const { resolvedTheme, setTheme } = useTheme();
+
+  function requestPrompt(title: string): Promise<string | null> {
+    return new Promise((resolve) => {
+      setPromptInputValue("");
+      setPromptData({ open: true, title, resolve });
+    });
+  }
+
+  function handlePromptSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (promptData) {
+      promptData.resolve(promptInputValue);
+      setPromptData({ ...promptData, open: false });
+    }
+  }
+
+  function handlePromptCancel(open: boolean) {
+    if (!open && promptData?.open) {
+      promptData.resolve(null);
+      setPromptData({ ...promptData, open: false });
+    }
+  }
 
   const activeWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? workspaces[0],
@@ -261,7 +287,7 @@ export function OpenCodexShell() {
   }
 
   async function bindLocalFolder() {
-    const localPath = window.prompt("Project folder path");
+    const localPath = await requestPrompt("Project folder path:");
     if (!localPath?.trim()) return;
 
     const response = await fetch("/api/workspaces", {
@@ -284,7 +310,7 @@ export function OpenCodexShell() {
   }
 
   async function cloneGithubRepository() {
-    const repository = window.prompt("GitHub repository URL or owner/repo");
+    const repository = await requestPrompt("GitHub repository URL or owner/repo:");
     if (!repository?.trim()) return;
 
     setActiveRail("GitHub");
@@ -696,6 +722,31 @@ export function OpenCodexShell() {
           <StatusBar />
         </section>
       </main>
+
+      <Dialog open={promptData?.open || false} onOpenChange={handlePromptCancel}>
+        <DialogContent>
+          <form onSubmit={handlePromptSubmit}>
+            <DialogHeader>
+              <DialogTitle>{promptData?.title || "Prompt"}</DialogTitle>
+              <DialogDescription>Please enter the value requested.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Input
+                autoFocus
+                value={promptInputValue}
+                onChange={(e) => setPromptInputValue(e.target.value)}
+                placeholder="Enter value..."
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => handlePromptCancel(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Confirm</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 }
