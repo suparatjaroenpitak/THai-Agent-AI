@@ -9,5 +9,14 @@
     "status": "ready",
     "createdAt": "2026-06-23T13:07:15.713Z",
     "updatedAt": "2026-06-23T13:07:17.775Z"
+  },
+  {
+    "id": "local-7fe6154cd8",
+    "name": "Exam-กพ-2569",
+    "kind": "local",
+    "rootPath": "D:\\แอพใช้งาน\\แอพข้อสอบกพ\\Exam-กพ-2569",
+    "status": "ready",
+    "createdAt": "2026-06-23T14:07:00.441Z",
+    "updatedAt": "2026-06-23T14:07:00.441Z"
   }
 ]
