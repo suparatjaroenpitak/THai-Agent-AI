@@ -151,22 +151,6 @@ export function OpenCodexShell() {
   );
   const isDirty = activeFile ? dirtyFiles[activeFile] : false;
 
-  function closeFileTab(path: string, e: React.MouseEvent) {
-    e.stopPropagation();
-    setOpenFileTabs((currentTabs) => {
-      const newTabs = currentTabs.filter((t) => t !== path);
-      if (activeFile === path) {
-        if (newTabs.length > 0) {
-          void openFile(newTabs[newTabs.length - 1]);
-        } else {
-          setActiveFile("");
-          setEditorFile(emptyEditorFile);
-        }
-      }
-      return newTabs;
-    });
-  }
-
   useEffect(() => {
     setThemeReady(true);
     setModelConfig(parseStoredModelConfig());
@@ -325,6 +309,24 @@ export function OpenCodexShell() {
         setActiveFile("");
         setEditorFile(emptyEditorFile);
       }
+    }
+    
+    await loadWorkspaceTree(activeWorkspaceId);
+  }
+
+  async function handleRenameNode(oldPath: string, newName: string) {
+    const parentPath = oldPath.substring(0, oldPath.lastIndexOf("/"));
+    const newPath = parentPath ? `${parentPath}/${newName}` : newName;
+    if (oldPath === newPath) return;
+
+    await runTerminalCommand(`bun run -e "import { rename } from 'node:fs/promises'; await rename('${oldPath}', '${newPath}')"`);
+    
+    const nextTabs = openFileTabs.map((tab) => tab === oldPath ? newPath : tab);
+    setOpenFileTabs(nextTabs);
+    
+    if (activeFile === oldPath) {
+      setActiveFile(newPath);
+      setEditorFile({ ...editorFile, path: newPath });
     }
     
     await loadWorkspaceTree(activeWorkspaceId);
@@ -708,6 +710,7 @@ export function OpenCodexShell() {
                 onCreateFile={handleCreateFile}
                 onCreateFolder={handleCreateFolder}
                 onDeleteNode={handleDeleteNode}
+                onRenameNode={handleRenameNode}
               />
             </Panel>
 
