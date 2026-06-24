@@ -59,7 +59,33 @@ const AgentState = Annotation.Root({
   }),
 });
 
+const SAFE_OLLAMA_NUM_CTX = 8192;
+const FALLBACK_OLLAMA_NUM_CTX = 4096;
+const SAFE_PROMPT_CHARS = 18000;
+const FALLBACK_PROMPT_CHARS = 10000;
+
 // ── Helper ──────────────────────────────────────────────────────────────────
+
+function clampPrompt(content: string, limit: number): string {
+  if (content.length <= limit) {
+    return content;
+  }
+
+  const headLength = Math.floor(limit * 0.8);
+  const tailLength = Math.max(0, limit - headLength);
+  const omittedChars = content.length - headLength - tailLength;
+
+  return [
+    content.slice(0, headLength),
+    `[truncated ${omittedChars} chars to fit local Ollama memory limits]`,
+    content.slice(-tailLength),
+  ].join("\n\n");
+}
+
+function isCudaMemoryFault(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return message.includes("cuda error") || message.includes("illegal memory access");
+}
 
 async function callOllama(
   systemPrompt: string,
@@ -69,17 +95,63 @@ async function callOllama(
   const start = Date.now();
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
-    { role: "user", content: userContent },
+    { role: "user", content: clampPrompt(userContent, SAFE_PROMPT_CHARS) },
   ];
 
+  try {
     const result = await runOllamaChat({ 
       messages, 
       model,
-      options: { num_ctx: 32768, temperature: 0.1 }
+      options: { num_ctx: SAFE_OLLAMA_NUM_CTX, temperature: 0.1 }
     });
+
+    return {
+      content: result.message.content,
+      duration: Date.now() - start,
+    };
+  } catch (error) {
+    if (!isCudaMemoryFault(error)) {
+      throw error;
+    }
+
+    const retryMessages: ChatMessage[] = [
+      {
+        role: "system",
+        content: `${systemPrompt}\nKeep the answer concise and prioritize only the highest-signal findings.`,
+      },
+      { role: "user", content: clampPrompt(userContent, FALLBACK_PROMPT_CHARS) },
+    ];
+
+    try {
+      const retryResult = await runOllamaChat({
+        messages: retryMessages,
+        model,
+        options: { num_ctx: FALLBACK_OLLAMA_NUM_CTX, temperature: 0.1 },
+      });
+
+      return {
+        content: retryResult.message.content,
+        duration: Date.now() - start,
+      };
+    } catch (retryError) {
+      const primaryMessage = error instanceof Error ? error.message : String(error);
+      const retryMessage = retryError instanceof Error ? retryError.message : String(retryError);
+      throw new Error(
+        `Ollama CUDA fallback failed after reducing context from ${SAFE_OLLAMA_NUM_CTX} to ${FALLBACK_OLLAMA_NUM_CTX}. Initial error: ${primaryMessage}. Retry error: ${retryMessage}`
+      );
+    }
+  }
+}
+
+async function plannerAgent(state: typeof AgentState.State) {
+  try {
+    const model = state.model?.model || "qwen2.5-coder:7b";
     
+    // Fallback logic
+    const activeModel = await resolveModel();
+    const finalModel = model ?? activeModel;
     const result = await callOllama(
-      "You are a senior engineering planner. Analyze the user's request and break it down into concrete execution steps. Output a numbered plan. Be concise.",
+      "You are a senior engineering planner. Analyze the user's request and break it down into concrete execution steps. Output a numbered plan. Be concise.\nAlways respond and explain your thoughts clearly in Thai language.",
       `Workspace: ${state.workspaceId}\nActive file: ${state.activePath ?? "none"}\n\nRequest:\n${state.prompt}`,
       model
     );
@@ -130,7 +202,8 @@ async function architectAgent(state: typeof AgentState.State) {
 
   try {
     const result = await callOllama(
-      "You are a software architect. Review the plan and workspace context. Propose the architecture, file structure, and key design decisions. Specify which files to create/modify and what changes are needed.",
+      `You are a software architect. Review the plan and workspace context. Propose the architecture, file structure, and key design decisions. Specify which files to create/modify and what changes are needed.
+Always respond and explain your thoughts clearly in Thai language.`,
       `Plan:\n${state.plan}\n\nContext:\n${state.context.slice(0, 16000)}`,
       model
     );
@@ -163,7 +236,8 @@ async function coderAgent(state: typeof AgentState.State) {
 
   try {
     const result = await callOllama(
-      "You are a senior coding agent. Work from the provided plan and repository context. Return concrete file edits, new files, and terminal commands to run. Include exact file paths and complete code — no placeholders or TODOs.",
+      `You are a senior coding agent. Work from the provided plan and repository context. Return concrete file edits, new files, and terminal commands to run. Include exact file paths and complete code — no placeholders or TODOs.
+Always respond and explain your thoughts clearly in Thai language.`,
       `Plan:\n${state.plan}\n\nArchitecture decisions from previous steps:\n${state.steps
         .filter((s) => s.role === "Architect")
         .map((s) => s.content)
@@ -192,7 +266,8 @@ async function reviewerAgent(state: typeof AgentState.State) {
   try {
     const coderOutput = state.steps.filter((s) => s.role === "Coder").map((s) => s.content).join("\n");
     const result = await callOllama(
-      "You are a code reviewer. Review the proposed changes for correctness, security, and best practices. Flag issues and suggest improvements. Be specific about file paths and line references.",
+      `You are a code reviewer. Review the proposed changes for correctness, security, and best practices. Flag issues and suggest improvements. Be specific about file paths and line references.
+Always respond and explain your thoughts clearly in Thai language.`,
       `Code changes:\n${coderOutput.slice(0, 24000)}`,
       model
     );
@@ -214,7 +289,8 @@ async function testerAgent(state: typeof AgentState.State) {
   try {
     const coderOutput = state.steps.filter((s) => s.role === "Coder").map((s) => s.content).join("\n");
     const result = await callOllama(
-      "You are a testing engineer. Based on the code changes, generate test cases, verification commands, and expected outcomes. Use bun test / vitest format.",
+      `You are a testing engineer. Based on the code changes, generate test cases, verification commands, and expected outcomes. Use bun test / vitest format.
+Always respond and explain your thoughts clearly in Thai language.`,
       `Code changes:\n${coderOutput.slice(0, 16000)}`,
       model
     );
@@ -236,7 +312,8 @@ async function debuggerAgent(state: typeof AgentState.State) {
   try {
     const failedSteps = state.steps.filter((s) => s.status === "failed").map((s) => `${s.role}: ${s.content}`).join("\n");
     const result = await callOllama(
-      "You are a debugging agent. Analyze the errors and propose fixes. Provide exact code patches.",
+      `You are a debugging agent. Analyze the errors and propose fixes. Provide exact code patches.
+Always respond and explain your thoughts clearly in Thai language.`,
       `Errors:\n${failedSteps}\n\nPlan:\n${state.plan}`,
       model
     );
@@ -260,7 +337,8 @@ async function securityAgent(state: typeof AgentState.State) {
   try {
     const coderOutput = state.steps.filter((s) => s.role === "Coder").map((s) => s.content).join("\n");
     const result = await callOllama(
-      "You are a security auditor. Review the code changes for security vulnerabilities: SQL injection, XSS, CSRF, secrets exposure, auth bypass, path traversal. Report findings with severity.",
+      `You are a security auditor. Review the code changes for security vulnerabilities: SQL injection, XSS, CSRF, secrets exposure, auth bypass, path traversal. Report findings with severity.
+Always respond and explain your thoughts clearly in Thai language.`,
       `Code changes:\n${coderOutput.slice(0, 16000)}`,
       model
     );
@@ -281,7 +359,8 @@ async function documentationAgent(state: typeof AgentState.State) {
 
   try {
     const result = await callOllama(
-      "You are a documentation writer. Based on the changes made, generate or update documentation: README sections, API docs, code comments, and changelog entries.",
+      `You are a documentation writer. Based on the changes made, generate or update documentation: README sections, API docs, code comments, and changelog entries.
+Always respond and explain your thoughts clearly in Thai language.`,
       `Summary:\n${state.summary}\n\nPlan:\n${state.plan}`,
       model
     );
