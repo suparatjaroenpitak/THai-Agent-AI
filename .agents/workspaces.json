@@ -104,5 +104,27 @@
     "status": "ready",
     "createdAt": "2026-06-23T15:21:43.300Z",
     "updatedAt": "2026-06-23T15:21:44.615Z"
+  },
+  {
+    "id": "github-28d5127566-9be83acc",
+    "name": "POS2",
+    "kind": "github",
+    "rootPath": "D:\\แอพใช้งาน\\ai agent\\THai-Agent-AI\\.agents\\workspaces\\POS2.git-c7b08ee52f",
+    "repository": "https://github.com/suparatjaroenpitak/POS2.git",
+    "branch": "main",
+    "status": "ready",
+    "createdAt": "2026-06-24T02:52:24.981Z",
+    "updatedAt": "2026-06-24T02:52:26.310Z"
+  },
+  {
+    "id": "github-28d5127566-5c8670b2",
+    "name": "POS2",
+    "kind": "github",
+    "rootPath": "D:\\แอพใช้งาน\\ai agent\\THai-Agent-AI\\.agents\\workspaces\\POS2.git-2f10815f5c",
+    "repository": "https://github.com/suparatjaroenpitak/POS2.git",
+    "branch": "main",
+    "status": "ready",
+    "createdAt": "2026-06-24T02:53:44.610Z",
+    "updatedAt": "2026-06-24T02:53:46.351Z"
   }
 ]
