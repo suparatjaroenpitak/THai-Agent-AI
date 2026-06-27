@@ -58,13 +58,23 @@ export type StreamToolCallEvent = {
   arguments: Record<string, unknown>;
 };
 
+export type StreamToolResultEvent = {
+  type: "tool_result";
+  tool: string;
+  success: boolean;
+  output: string;
+  durationMs: number;
+};
+
 export type StreamDoneEvent = {
   type: "done";
-  model: string;
+  model?: string;
   totalDuration?: number;
+  totalDurationMs?: number;
   promptTokens?: number;
   completionTokens?: number;
   evalDuration?: number;
+  totalTokens?: number;
 };
 
 export type StreamErrorEvent = {
@@ -72,4 +82,9 @@ export type StreamErrorEvent = {
   error: string;
 };
 
-export type StreamEvent = StreamChunkEvent | StreamToolCallEvent | StreamDoneEvent | StreamErrorEvent | { type: "aborted" };
+export type StreamTextEvent = {
+  type: "text";
+  content: string;
+};
+
+export type StreamEvent = StreamChunkEvent | StreamTextEvent | StreamToolCallEvent | StreamToolResultEvent | StreamDoneEvent | StreamErrorEvent | { type: "aborted" };

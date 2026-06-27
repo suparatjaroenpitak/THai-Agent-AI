@@ -15,6 +15,13 @@ export type OllamaToolCall = {
   };
 };
 
+export type OllamaJsonSchemaProperty = {
+  type: string;
+  description?: string;
+  items?: OllamaJsonSchemaProperty;
+  enum?: string[];
+};
+
 export type OllamaToolDefinition = {
   type: "function";
   function: {
@@ -22,7 +29,7 @@ export type OllamaToolDefinition = {
     description: string;
     parameters: {
       type: "object";
-      properties: Record<string, { type: string; description: string }>;
+      properties: Record<string, OllamaJsonSchemaProperty>;
       required?: string[];
     };
   };

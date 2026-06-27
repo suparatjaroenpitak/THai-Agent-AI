@@ -2,6 +2,7 @@ import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
 import { runOllamaChat, resolveModel, type RuntimeModelConfig, type ChatMessage } from "@/ai/model-client";
 import { routeModel, type RoutingMode } from "@/ai/router";
 import { collectWorkspaceContext } from "@/workspace/server-project";
+import { toolDefinitions, executeTool } from "@/ai/tools";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,10 @@ const AgentState = Annotation.Root({
   plan: Annotation<string>({
     default: () => "",
     reducer: (_left, right) => right,
+  }),
+  toolResults: Annotation<string[]>({
+    default: () => [],
+    reducer: (left, right) => left.concat(right),
   }),
 });
 
@@ -235,20 +240,58 @@ async function coderAgent(state: typeof AgentState.State) {
   const model = resolveModel(state.model, "coding");
 
   try {
-    const result = await callOllama(
-      `You are a senior coding agent. Work from the provided plan and repository context. Return concrete file edits, new files, and terminal commands to run. Include exact file paths and complete code — no placeholders or TODOs.
-Always respond and explain your thoughts clearly in Thai language.`,
-      `Plan:\n${state.plan}\n\nArchitecture decisions from previous steps:\n${state.steps
-        .filter((s) => s.role === "Architect")
-        .map((s) => s.content)
-        .join("\n")}\n\nWorkspace context:\n${state.context.slice(0, 24000)}`,
-      model
-    );
+    const messages: ChatMessage[] = [
+      {
+        role: "system",
+        content: `You are a senior coding agent. Work from the provided plan and repository context.
+
+You have tools available to:
+- Read files from the workspace
+- Write files (create/modify code)
+- Run terminal commands (install deps, build, etc.)
+- Run git commands
+- Search code
+
+Use these tools to actually make the code changes needed. When you're done, provide a summary of what was changed.
+
+Important: Always respond in Thai language.`,
+      },
+      {
+        role: "user",
+        content: clampPrompt(
+          `Plan:\n${state.plan}\n\nArchitecture decisions:\n${state.steps
+            .filter((s) => s.role === "Architect")
+            .map((s) => s.content)
+            .join("\n")}\n\nWorkspace context:\n${state.context.slice(0, 24000)}`,
+          SAFE_PROMPT_CHARS
+        ),
+      },
+    ];
+
+    const response = await runOllamaChat({
+      messages,
+      model,
+      tools: toolDefinitions,
+      options: { num_ctx: SAFE_OLLAMA_NUM_CTX, temperature: 0.1 },
+    });
+
+    const { content, tool_calls } = response.message;
+    const toolResults: string[] = [];
+
+    if (tool_calls) {
+      for (const tc of tool_calls) {
+        const result = await executeTool(tc, state.workspaceId);
+        toolResults.push(`${tc.function.name}: ${result.success ? "OK" : "FAIL"} - ${result.output.slice(0, 500)}`);
+      }
+    }
+
+    const toolResultStr = toolResults.length > 0 ? `\n\nTool execution results:\n${toolResults.join("\n")}` : "";
 
     return {
       needsFix: false,
-      summary: result.content,
-      steps: [{ role: "Coder", status: "done" as const, content: result.content, duration: result.duration }],
+      summary: content + toolResultStr,
+      toolResults,
+      steps: [{ role: "Coder", status: "done" as const, content: content + toolResultStr, duration: response.total_duration ? Math.round(response.total_duration / 1_000_000) : 0 }],
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Coder agent failed";
@@ -288,15 +331,39 @@ async function testerAgent(state: typeof AgentState.State) {
 
   try {
     const coderOutput = state.steps.filter((s) => s.role === "Coder").map((s) => s.content).join("\n");
-    const result = await callOllama(
-      `You are a testing engineer. Based on the code changes, generate test cases, verification commands, and expected outcomes. Use bun test / vitest format.
-Always respond and explain your thoughts clearly in Thai language.`,
-      `Code changes:\n${coderOutput.slice(0, 16000)}`,
-      model
-    );
+
+    const messages: ChatMessage[] = [
+      {
+        role: "system",
+        content: `You are a testing engineer. Run the project's test suite using tools (e.g. 'bun test', 'npm test', 'vitest run'). If tests fail, report the failures clearly. Always respond in Thai language.`,
+      },
+      {
+        role: "user",
+        content: clampPrompt(`Code changes made:\n${coderOutput.slice(0, 8000)}\n\nRun the test suite to verify everything works.`, FALLBACK_PROMPT_CHARS),
+      },
+    ];
+
+    const response = await runOllamaChat({
+      messages,
+      model,
+      tools: toolDefinitions,
+      options: { num_ctx: FALLBACK_OLLAMA_NUM_CTX, temperature: 0.1 },
+    });
+
+    const toolResults: string[] = [];
+    if (response.message.tool_calls) {
+      for (const tc of response.message.tool_calls) {
+        const result = await executeTool(tc, state.workspaceId);
+        toolResults.push(`${tc.function.name}: ${result.success ? "OK" : "FAIL"} - ${result.output.slice(0, 500)}`);
+      }
+    }
+
+    const content = response.message.content;
+    const extras = toolResults.length > 0 ? `\n---\nTest results:\n${toolResults.join("\n")}` : "";
 
     return {
-      steps: [{ role: "Tester", status: "done" as const, content: result.content, duration: result.duration }],
+      toolResults,
+      steps: [{ role: "Tester", status: "done" as const, content: content + extras }],
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Tester failed";
@@ -311,16 +378,39 @@ async function debuggerAgent(state: typeof AgentState.State) {
 
   try {
     const failedSteps = state.steps.filter((s) => s.status === "failed").map((s) => `${s.role}: ${s.content}`).join("\n");
-    const result = await callOllama(
-      `You are a debugging agent. Analyze the errors and propose fixes. Provide exact code patches.
-Always respond and explain your thoughts clearly in Thai language.`,
-      `Errors:\n${failedSteps}\n\nPlan:\n${state.plan}`,
-      model
-    );
+    const messages: ChatMessage[] = [
+      {
+        role: "system",
+        content: `You are a debugging agent. Analyze errors and use tools to diagnose and fix issues. You can run terminal commands, read files, and write fixes. Always respond in Thai language.`,
+      },
+      {
+        role: "user",
+        content: clampPrompt(`Errors:\n${failedSteps}\n\nPlan:\n${state.plan}`, SAFE_PROMPT_CHARS),
+      },
+    ];
+
+    const response = await runOllamaChat({
+      messages,
+      model,
+      tools: toolDefinitions,
+      options: { num_ctx: SAFE_OLLAMA_NUM_CTX, temperature: 0.1 },
+    });
+
+    const toolResults: string[] = [];
+    if (response.message.tool_calls) {
+      for (const tc of response.message.tool_calls) {
+        const result = await executeTool(tc, state.workspaceId);
+        toolResults.push(`${tc.function.name}: ${result.success ? "OK" : "FAIL"} - ${result.output.slice(0, 300)}`);
+      }
+    }
+
+    const content = response.message.content;
+    const extras = toolResults.length > 0 ? `\n---\nTool results:\n${toolResults.join("\n")}` : "";
 
     return {
       needsFix: false,
-      steps: [{ role: "Debugger", status: "done" as const, content: result.content, duration: result.duration }],
+      toolResults,
+      steps: [{ role: "Debugger", status: "done" as const, content: content + extras }],
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Debugger failed";
@@ -377,16 +467,51 @@ Always respond and explain your thoughts clearly in Thai language.`,
 }
 
 async function gitAgent(state: typeof AgentState.State) {
-  return {
-    summary: state.summary || "Agent workflow completed.",
-    steps: [
+  const model = resolveModel(state.model, "coding");
+
+  try {
+    const messages: ChatMessage[] = [
       {
-        role: "Git",
-        status: "done" as const,
-        content: "Use the Git tab to inspect status, diff, commit, and push from the selected workspace.",
+        role: "system",
+        content: `You are a git automation agent. Review the changes made and use git tools to stage, commit, and push them. Write meaningful commit messages. Always respond in Thai language.`,
       },
-    ],
-  };
+      {
+        role: "user",
+        content: clampPrompt(
+          `Summary of changes:\n${state.summary}\n\nPlan:\n${state.plan}\n\nTool results:\n${state.toolResults.join("\n")}\n\nRun git status first to see what changed, then git add and git commit with an appropriate message.`,
+          FALLBACK_PROMPT_CHARS
+        ),
+      },
+    ];
+
+    const response = await runOllamaChat({
+      messages,
+      model,
+      tools: toolDefinitions,
+      options: { num_ctx: FALLBACK_OLLAMA_NUM_CTX, temperature: 0.1 },
+    });
+
+    const toolResults: string[] = [];
+    if (response.message.tool_calls) {
+      for (const tc of response.message.tool_calls) {
+        const result = await executeTool(tc, state.workspaceId);
+        toolResults.push(`${tc.function.name}: ${result.success ? "OK" : "FAIL"} - ${result.output.slice(0, 300)}`);
+      }
+    }
+
+    const content = response.message.content;
+    const extras = toolResults.length > 0 ? `\n---\nGit results:\n${toolResults.join("\n")}` : "";
+
+    return {
+      summary: state.summary || "Agent workflow completed.",
+      steps: [{ role: "Git", status: "done" as const, content: content + extras }],
+    };
+  } catch {
+    return {
+      summary: state.summary || "Agent workflow completed.",
+      steps: [{ role: "Git", status: "done" as const, content: "Use the Git tab to inspect status, diff, commit, and push from the selected workspace." }],
+    };
+  }
 }
 
 // ── Conditional Edges ───────────────────────────────────────────────────────

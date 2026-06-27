@@ -70,14 +70,16 @@ export function AgentChat({
     });
   }, []);
 
-  async function submitStreamingChat(userPrompt: string) {
+  async function submitStreamingChat(userPrompt: string, agentMode = false) {
     if (!userPrompt.trim() || busy) return;
     setBusy(true);
     setStreaming(true);
     lastPromptRef.current = userPrompt;
 
     addMessage({ role: "user", content: userPrompt });
-    addMessage({ role: "assistant", content: "" });
+    if (!agentMode) {
+      addMessage({ role: "assistant", content: "" });
+    }
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -90,13 +92,15 @@ export function AgentChat({
           messages: [
             {
               role: "system",
-              content: `You are a senior AI coding agent. You help users inspect, edit, test, and deploy code. Workspace: ${workspaceId}. Active file: ${activePath ?? "none"}. Be concise and actionable.`,
+              content: `You are a senior AI coding agent. You help users inspect, edit, test, and deploy code. Workspace: ${workspaceId}. Active file: ${activePath ?? "none"}. Be concise and actionable. Always respond in Thai language.`,
             },
             { role: "user", content: userPrompt },
           ],
           model: modelConfig.model,
           temperature: 0.2,
           num_ctx: 8192,
+          agent: agentMode,
+          workspaceId,
         }),
         signal: controller.signal,
       });
@@ -111,6 +115,7 @@ export function AgentChat({
       const decoder = new TextDecoder();
       let accumulated = "";
       let buffer = "";
+      let toolMessagesCount = 0;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -133,37 +138,65 @@ export function AgentChat({
               updateLastAssistant(accumulated);
             }
 
+            if (event.type === "text") {
+              if (!agentMode) {
+                accumulated += event.content;
+                updateLastAssistant(accumulated);
+              } else {
+                addMessage({ role: "assistant", content: event.content });
+              }
+            }
+
             if (event.type === "tool_call") {
+              toolMessagesCount++;
               addMessage({
                 role: "tool",
-                content: `Tool: ${event.tool}\nArgs: ${JSON.stringify(event.arguments, null, 2)}`,
+                content: `🔧 Calling tool: ${event.tool}\nArguments:\n\`\`\`json\n${JSON.stringify(event.arguments, null, 2)}\n\`\`\``,
+              });
+            }
+
+            if (event.type === "tool_result") {
+              const statusIcon = event.success ? "✅" : "❌";
+              addMessage({
+                role: "tool",
+                content: `${statusIcon} Tool: ${event.tool} (${event.durationMs}ms)\n\`\`\`\n${event.output.slice(0, 2000)}${event.output.length > 2000 ? "\n... (truncated)" : ""}\n\`\`\``,
               });
             }
 
             if (event.type === "done") {
-              setMessages((current) => {
-                const updated = [...current];
-                for (let i = updated.length - 1; i >= 0; i--) {
-                  if (updated[i].role === "assistant") {
-                    updated[i] = {
-                      ...updated[i],
-                      model: event.model,
-                      duration: event.totalDuration ? Math.round(event.totalDuration / 1_000_000) : undefined,
-                      tokenCount: event.completionTokens,
-                    };
-                    break;
+              if (agentMode) {
+                // Agent mode complete
+              } else {
+                setMessages((current) => {
+                  const updated = [...current];
+                  for (let i = updated.length - 1; i >= 0; i--) {
+                    if (updated[i].role === "assistant") {
+                      updated[i] = {
+                        ...updated[i],
+                        model: (event as any).model,
+                        duration: (event as any).totalDuration ? Math.round((event as any).totalDuration / 1_000_000) : undefined,
+                        tokenCount: (event as any).completionTokens,
+                      };
+                      break;
+                    }
                   }
-                }
-                return updated;
-              });
+                  return updated;
+                });
+              }
             }
 
             if (event.type === "error") {
-              updateLastAssistant(`Error: ${event.error}`);
+              if (agentMode) {
+                addMessage({ role: "assistant", content: `Error: ${event.error}` });
+              } else {
+                updateLastAssistant(`Error: ${event.error}`);
+              }
             }
 
             if (event.type === "aborted") {
-              updateLastAssistant(accumulated || "(Aborted)");
+              if (!agentMode) {
+                updateLastAssistant(accumulated || "(Aborted)");
+              }
             }
           } catch {
             // skip malformed SSE
@@ -175,7 +208,11 @@ export function AgentChat({
         // User cancelled — keep what we have
       } else {
         const message = error instanceof Error ? error.message : "Stream failed";
-        updateLastAssistant(`Connection error: ${message}`);
+        if (agentMode) {
+          addMessage({ role: "assistant", content: `Connection error: ${message}` });
+        } else {
+          updateLastAssistant(`Connection error: ${message}`);
+        }
       }
     } finally {
       setBusy(false);
@@ -231,12 +268,15 @@ export function AgentChat({
     const userPrompt = prompt.trim();
     setPrompt("");
 
-    // Use streaming chat for direct chat, agent workflow for complex tasks
     if (promptMode === "agent" || userPrompt.startsWith("/agent ") || userPrompt.startsWith("/workflow ")) {
       const cleanPrompt = userPrompt.replace(/^\/(agent|workflow)\s+/, "");
-      void submitAgentWorkflow(cleanPrompt);
+      if (promptMode === "agent") {
+        void submitStreamingChat(cleanPrompt, true);
+      } else {
+        void submitAgentWorkflow(cleanPrompt);
+      }
     } else {
-      void submitStreamingChat(userPrompt);
+      void submitStreamingChat(userPrompt, false);
     }
   }
 

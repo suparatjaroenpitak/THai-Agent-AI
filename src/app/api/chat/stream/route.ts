@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { runOllamaChatStream, resolveModel, type ChatMessage, type OllamaToolDefinition, type OllamaToolCall } from "@/ai/model-client";
+import { runOllamaChatStream, type ChatMessage, type OllamaToolDefinition, type OllamaToolCall } from "@/ai/model-client";
+import { runAgentLoop } from "@/ai/agent-loop";
 import { env } from "@/env";
 
 export const runtime = "nodejs";
@@ -30,6 +31,8 @@ const requestSchema = z.object({
       })
     )
     .optional(),
+  agent: z.boolean().optional().default(false),
+  workspaceId: z.string().optional().default("current-workspace"),
 });
 
 /** POST /api/chat/stream — Streaming chat via Ollama */
@@ -48,60 +51,91 @@ export async function POST(request: Request) {
   const encoder = new TextEncoder();
   const abortController = new AbortController();
 
-  // Abort if the client disconnects
   request.signal.addEventListener("abort", () => abortController.abort());
 
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        await runOllamaChatStream({
-          messages: body.messages as ChatMessage[],
-          model,
-          options: {
-            temperature: body.temperature,
-            top_p: body.top_p,
-            seed: body.seed,
-            num_ctx: body.num_ctx ?? 8192,
-            repeat_penalty: body.repeat_penalty,
-            stop: body.stop,
-          },
-          tools: body.tools as OllamaToolDefinition[] | undefined,
-          signal: abortController.signal,
+        if (body.agent) {
+          // ── Agent mode: model can call tools, loop automatically ──
+          const systemPrompt = body.messages.find((m) => m.role === "system")?.content;
+          const userMessages = body.messages.filter((m) => m.role !== "system");
 
-          onChunk(chunk) {
-            const event = {
-              type: "chunk" as const,
-              content: chunk.message.content,
-              done: chunk.done,
-              model: chunk.model,
-            };
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-          },
+          await runAgentLoop(userMessages as ChatMessage[], {
+            systemPrompt,
+            model,
+            workspaceId: body.workspaceId,
+            signal: abortController.signal,
+            options: {
+              temperature: body.temperature ?? 0.1,
+              num_ctx: body.num_ctx ?? 8192,
+            },
+            onEvent(event) {
+              const eventData = {
+                type: event.type,
+                ...(event.type === "text" ? { content: event.content } : {}),
+                ...(event.type === "tool_call" ? { tool: event.tool, arguments: event.arguments } : {}),
+                ...(event.type === "tool_result" ? { tool: event.tool, success: event.success, output: event.output, durationMs: event.durationMs } : {}),
+                ...(event.type === "done" ? { totalDurationMs: event.totalDurationMs, totalTokens: event.totalTokens } : {}),
+                ...(event.type === "error" ? { error: event.error } : {}),
+              };
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(eventData)}\n\n`));
+            },
+          });
 
-          onToolCall(toolCall: OllamaToolCall) {
-            const event = {
-              type: "tool_call" as const,
-              tool: toolCall.function.name,
-              arguments: toolCall.function.arguments,
-            };
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-          },
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        } else {
+          // ── Simple streaming mode (no tool loop) ──
+          await runOllamaChatStream({
+            messages: body.messages as ChatMessage[],
+            model,
+            options: {
+              temperature: body.temperature,
+              top_p: body.top_p,
+              seed: body.seed,
+              num_ctx: body.num_ctx ?? 8192,
+              repeat_penalty: body.repeat_penalty,
+              stop: body.stop,
+            },
+            tools: body.tools as OllamaToolDefinition[] | undefined,
+            signal: abortController.signal,
 
-          onDone(finalChunk) {
-            const event = {
-              type: "done" as const,
-              model: finalChunk.model,
-              totalDuration: finalChunk.total_duration,
-              promptTokens: finalChunk.prompt_eval_count,
-              completionTokens: finalChunk.eval_count,
-              evalDuration: finalChunk.eval_duration,
-            };
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-          },
-        });
+            onChunk(chunk) {
+              const event = {
+                type: "chunk" as const,
+                content: chunk.message.content,
+                done: chunk.done,
+                model: chunk.model,
+              };
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+            },
 
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        controller.close();
+            onToolCall(toolCall: OllamaToolCall) {
+              const event = {
+                type: "tool_call" as const,
+                tool: toolCall.function.name,
+                arguments: toolCall.function.arguments,
+              };
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+            },
+
+            onDone(finalChunk) {
+              const event = {
+                type: "done" as const,
+                model: finalChunk.model,
+                totalDuration: finalChunk.total_duration,
+                promptTokens: finalChunk.prompt_eval_count,
+                completionTokens: finalChunk.eval_count,
+                evalDuration: finalChunk.eval_duration,
+              };
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+            },
+          });
+
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        }
       } catch (error) {
         if (abortController.signal.aborted) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "aborted" })}\n\n`));

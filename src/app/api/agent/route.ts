@@ -48,5 +48,6 @@ export async function POST(request: Request) {
     message: result.summary || `Completed workflow with ${routing.primary}.`,
     routing,
     steps: result.steps,
+    toolResults: result.toolResults,
   });
 }
